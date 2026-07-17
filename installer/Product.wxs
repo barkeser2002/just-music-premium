@@ -16,7 +16,7 @@
              Description="Just Music Premium kurulumu" />
 
     <MajorUpgrade AllowSameVersionUpgrades="yes"
-                  DowngradeErrorMessage="Daha yeni bir Just Music Premium sürümü zaten kurulu." />
+                  DowngradeErrorMessage="Daha yeni bir Just Music Premium surumu zaten kurulu." />
     <MediaTemplate EmbedCab="yes" />
 
     <Icon Id="AppIcon.ico" SourceFile="$(var.IconFile)" />
