@@ -1,0 +1,101 @@
+name: Build MSI & Release
+
+# v* etiketi push edilince (ör. v1.0.0) bulutta .msi derler ve Release'e ekler.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Sürüm (ör. 1.0.0) — etiketsiz manuel derleme için"
+        required: false
+        default: "0.0.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Sürümü belirle (etiket veya girdi)
+        id: ver
+        shell: pwsh
+        run: |
+          $ref = "${{ github.ref_name }}"
+          if ($ref -match '^v\d') { $tag = $ref } else { $tag = "v${{ github.event.inputs.version }}" }
+          $version = $tag.TrimStart('v','V')
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "tag=$tag"         | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "tag=$tag version=$version"
+
+      - name: config.APP_VERSION'u damgala
+        shell: pwsh
+        run: |
+          $v = "${{ steps.ver.outputs.version }}"
+          (Get-Content justmusic/config.py -Raw) -replace 'APP_VERSION = "[^"]*"', "APP_VERSION = `"$v`"" |
+            Set-Content justmusic/config.py -Encoding utf8
+          Select-String -Path justmusic/config.py -Pattern 'APP_VERSION ='
+
+      - name: Bağımlılıklar
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Gömülü ikilileri indir (ffmpeg + yt-dlp + deno)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force bin | Out-Null
+          Write-Host "ffmpeg…"
+          Invoke-WebRequest "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_tmp -Force
+          Copy-Item (Get-ChildItem ffmpeg_tmp -Recurse -Filter ffmpeg.exe | Select-Object -First 1).FullName bin\ffmpeg.exe -Force
+          Write-Host "yt-dlp…"
+          Invoke-WebRequest "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile bin\yt-dlp.exe
+          Write-Host "deno…"
+          Invoke-WebRequest "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip" -OutFile deno.zip
+          Expand-Archive deno.zip -DestinationPath deno_tmp -Force
+          Copy-Item deno_tmp\deno.exe bin\deno.exe -Force
+          Get-ChildItem bin | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+
+      - name: Derle (PyInstaller)
+        run: python build.py
+
+      - name: .msi paketle (WiX 3.14)
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.ver.outputs.version }}"
+          $wix = "$env:WIX\bin"
+          if (-not (Test-Path "$wix\heat.exe")) { $wix = "C:\Program Files (x86)\WiX Toolset v3.14\bin" }
+          if (-not (Test-Path "$wix\heat.exe")) {
+            Write-Host "WiX bulunamadı, choco ile kuruluyor…"
+            choco install wixtoolset --version=3.14.1 -y --no-progress
+            $wix = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
+          }
+          Write-Host "WiX: $wix"
+          New-Item -ItemType Directory -Force obj | Out-Null
+          & "$wix\heat.exe" dir "dist\JustMusic" -cg AppFiles -dr INSTALLFOLDER -gg -g1 -sfrag -srd -sreg -scom -var var.SourceDir -out AppFiles.wxs
+          if ($LASTEXITCODE -ne 0) { throw "heat başarısız" }
+          & "$wix\candle.exe" -arch x64 -dVersion="$ver" -dSourceDir="dist\JustMusic" -dIconFile="logo.ico" installer\Product.wxs AppFiles.wxs -out obj\
+          if ($LASTEXITCODE -ne 0) { throw "candle başarısız" }
+          & "$wix\light.exe" -sval -out "JustMusic-Setup.msi" obj\Product.wixobj obj\AppFiles.wixobj
+          if ($LASTEXITCODE -ne 0) { throw "light başarısız" }
+          Get-Item JustMusic-Setup.msi | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+
+      - name: Release'e yükle
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Just Music Premium ${{ steps.ver.outputs.tag }}
+          files: JustMusic-Setup.msi
+          body: |
+            **Just Music Premium ${{ steps.ver.outputs.tag }}** — Windows kurulumu (.msi)
+
+            `JustMusic-Setup.msi` dosyasını indirip çalıştırın (kullanıcı bazlı kurulum, yönetici/UAC gerekmez).
+            Uygulama içi **otomatik güncelleme** etkindir: yeni sürüm çıkınca arka planda indirilir ve kapanışta kurulur.

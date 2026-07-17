@@ -434,6 +434,23 @@ body.compact .sidebar,body.compact .right-panel{display:none}
 .clip-mini-btn{width:30px;height:30px;border:none;border-radius:8px;background:rgba(0,0,0,.62);color:#fff;
   cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center;transition:.15s}
 .clip-mini-btn:hover{background:var(--accent);color:#000}
+/* ===== Otomatik güncelleme çubuğu ===== */
+.update-bar{position:fixed;left:50%;top:14px;transform:translateX(-50%) translateY(-160%);z-index:11000;
+  display:flex;align-items:center;gap:12px;max-width:calc(100% - 40px);
+  padding:11px 12px 11px 16px;border-radius:14px;
+  background:linear-gradient(135deg,#12331f,#0d2417);border:1px solid rgba(29,185,84,.5);
+  box-shadow:0 16px 44px rgba(0,0,0,.6);opacity:0;
+  transition:transform .32s cubic-bezier(.2,.7,.2,1),opacity .32s}
+.update-bar.show{transform:translateX(-50%) translateY(0);opacity:1}
+.upd-ic{color:var(--accent2);font-size:18px;flex:0 0 auto}
+.upd-text{font-size:13px;color:#dfeee5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.upd-text b{color:#fff}
+.upd-btn{flex:0 0 auto;height:32px;padding:0 13px;border:none;border-radius:20px;background:var(--accent);
+  color:#062b16;font-weight:800;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.15s}
+.upd-btn:hover{background:var(--accent2);transform:scale(1.04)}
+.upd-x{flex:0 0 auto;width:30px;height:30px;border:none;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;font-size:14px}
+.upd-x:hover{background:rgba(255,255,255,.08);color:#fff}
+@media(max-width:640px){.upd-text{white-space:normal}}
 .hdr-desc{color:#d8d8d8;font-size:13px;margin:0 0 10px;max-width:520px;line-height:1.4}
 .nextup{display:flex;align-items:center;gap:12px;background:#181818;border-radius:10px;padding:10px;margin-top:8px;cursor:pointer;transition:.15s}
 .nextup:hover{background:#232323}

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Just Music Premium — perUser MSI (yönetici/UAC gerektirmez).
+     Sürüm ve kaynak candle'a -dVersion / -dSourceDir / -dIconFile ile verilir.
+     Dosyalar heat ile AppFiles.wxs'e toplanır (ComponentGroup: AppFiles). -->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="Just Music Premium"
+           Language="1033"
+           Version="$(var.Version)"
+           Manufacturer="barkeser2002"
+           UpgradeCode="7E9C2A14-6B3D-4F5A-9C21-1A2B3C4D5E60">
+
+    <Package InstallScope="perUser"
+             InstallerVersion="500"
+             Compressed="yes"
+             Description="Just Music Premium kurulumu" />
+
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="Daha yeni bir Just Music Premium sürümü zaten kurulu." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="AppIcon.ico" SourceFile="$(var.IconFile)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/barkeser2002/just-music-premium" />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="ProgramsFolder" Name="Programs">
+          <Directory Id="INSTALLFOLDER" Name="JustMusic" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="AppMenuDir" Name="Just Music Premium" />
+      </Directory>
+      <Directory Id="DesktopFolder" />
+    </Directory>
+
+    <!-- Başlat menüsü + masaüstü kısayolları (perUser: HKCU keypath şart) -->
+    <DirectoryRef Id="AppMenuDir">
+      <Component Id="AppShortcuts" Guid="*">
+        <Shortcut Id="StartMenuSc" Name="Just Music Premium"
+                  Target="[INSTALLFOLDER]JustMusic.exe"
+                  WorkingDirectory="INSTALLFOLDER" Icon="AppIcon.ico" />
+        <Shortcut Id="DesktopSc" Directory="DesktopFolder" Name="Just Music Premium"
+                  Target="[INSTALLFOLDER]JustMusic.exe"
+                  WorkingDirectory="INSTALLFOLDER" Icon="AppIcon.ico" />
+        <RemoveFolder Id="RemoveAppMenuDir" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\JustMusic"
+                       Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <Feature Id="MainFeature" Title="Just Music Premium" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="AppShortcuts" />
+    </Feature>
+  </Product>
+</Wix>

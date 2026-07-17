@@ -14,6 +14,16 @@ from pathlib import Path
 APP_NAME = "Just Music Premium"
 ORG_NAME = "JustMusic"
 
+# Sürüm — GitHub sürüm etiketiyle (v1.0.0) aynı tutulur. CI derlemede etiketten
+# damgalanır (bkz. .github/workflows/build.yml), böylece exe kendi sürümünü bilir.
+APP_VERSION = "1.0.0"
+
+# Otomatik güncelleme (GitHub Releases)
+GITHUB_OWNER = "barkeser2002"
+GITHUB_REPO = "just-music-premium"
+UPDATE_API = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+RELEASES_PAGE = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
+
 # Yazılabilir veri klasörü (kullanıcıya özel, Program Files gibi salt-okunur
 # konumlara kurulsa bile çalışır).
 BASE_DIR = Path.home() / "Music" / "JustMusic"

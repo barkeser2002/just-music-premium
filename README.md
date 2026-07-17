@@ -15,6 +15,19 @@ Windows için profesyonel müzik çalar. **Spotify tarzı web arayüzü (QtWebEn
 
 ![Mini oynatıcı](docs/mini-player.png)
 
+## ⬇ İndir & Kur (Windows)
+
+**[⬇ JustMusic-Setup.msi indir](https://github.com/barkeser2002/just-music-premium/releases/latest/download/JustMusic-Setup.msi)** &nbsp;·&nbsp;
+[Tüm sürümler](https://github.com/barkeser2002/just-music-premium/releases) &nbsp;·&nbsp;
+[🌐 Tanıtım sayfası](https://barkeser2002.github.io/just-music-premium/)
+
+- `.msi` **kullanıcı bazlı** kurar (yönetici/UAC gerekmez); Başlat menüsü + masaüstü kısayolu ekler.
+- **Otomatik güncelleme:** uygulama açılışta GitHub'da yeni sürüm arar; varsa `.msi`'yi arka planda
+  sessizce indirir ve **kapanışta kurup yeniden başlatır** (istersen "Şimdi yeniden başlat" ile hemen).
+- `.msi` **GitHub Actions'ta bulutta** derlenir (bkz. `.github/workflows/build.yml`): `v*` etiketi
+  push edilince ffmpeg/yt-dlp/deno indirilir, PyInstaller derler, **WiX** ile `.msi` paketlenir ve
+  Release'e yüklenir.
+
 ## 🏗 Mimari
 
 - **Arayüz:** HTML/CSS/JS (`justmusic/web/`), `QWebEngineView` içinde render edilir →

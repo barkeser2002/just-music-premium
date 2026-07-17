@@ -676,6 +676,28 @@ function wireSignals(){
   bridge.analysisSignal.connect(onAnalysis);
   bridge.loopSignal.connect(onLoop);
   bridge.videoReadySignal.connect(onVideoReady);
+  bridge.updateAvailableSignal.connect((v,notes)=>{updateInfo={version:v,notes:notes};});
+  bridge.updateProgressSignal.connect(p=>onUpdateProgress(p));
+  bridge.updateReadySignal.connect(v=>onUpdateReady(v));
+}
+
+/* ================= OTOMATİK GÜNCELLEME ================= */
+let updateInfo=null;
+function onUpdateProgress(p){
+  const b=$('#updateBar');if(!b)return;
+  const t=b.querySelector('.upd-text');if(t)t.textContent='Güncelleme indiriliyor… %'+Math.round(p);
+}
+function onUpdateReady(version){
+  let b=$('#updateBar');
+  if(!b){b=el('div','update-bar');b.id='updateBar';document.body.appendChild(b);}
+  b.innerHTML='';
+  const ic=el('span','upd-ic');ic.innerHTML=fa('circle-up');
+  const txt=el('span','upd-text');txt.innerHTML='<b>Güncelleme hazır: v'+version+'</b> — kapatınca otomatik kurulacak.';
+  const now=el('button','upd-btn');now.innerHTML=fa('rotate-right')+' Şimdi yeniden başlat';
+  now.onclick=()=>{showToast('Güncelleme kuruluyor, birazdan yeniden açılacak…');setTimeout(()=>bridge.installUpdateNow(),400);};
+  const x=el('button','upd-x');x.innerHTML=fa('xmark');x.title='Gizle (çıkışta yine de kurulur)';x.onclick=()=>b.remove();
+  b.append(ic,txt,now,x);
+  b.classList.add('show');
 }
 
 /* ================= EVENTS ================= */

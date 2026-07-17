@@ -10,11 +10,12 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 
 from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal, pyqtSlot
-from PyQt6.QtWidgets import QFileDialog
+from PyQt6.QtWidgets import QApplication, QFileDialog
 
-from . import config, engine as engine_mod, eqpresets, naming
+from . import config, engine as engine_mod, eqpresets, naming, updater
 from .covers import CoverFetcher
 from .downloader import DownloadThread
 from .engine import DspEngine
@@ -261,6 +262,9 @@ class Bridge(QObject):
     videoReadySignal = pyqtSignal(str)      # json {id, video, audio, title}
     analysisSignal = pyqtSignal(str)        # json {id, waveform, mood, color}
     loopSignal = pyqtSignal(float, float)   # A, B (sn); -1 = yok
+    updateAvailableSignal = pyqtSignal(str, str)  # sürüm, notlar
+    updateProgressSignal = pyqtSignal(float)      # indirme yüzdesi
+    updateReadySignal = pyqtSignal(str)           # sürüm (indirildi, çıkışta kurulur)
 
     def __init__(self, window=None, parent=None) -> None:
         super().__init__(parent)
@@ -304,6 +308,9 @@ class Bridge(QObject):
         self._listen_accum = 0.0
         self._cover_dirty = False
         self._closing = False
+        self._staged_update = None    # kurulacak .msi yolu (indirildiyse)
+        self._staged_version = ""
+        self._update_thread = None
 
         self._apply_audio_settings()
         self.poll = QTimer(self)
@@ -312,6 +319,8 @@ class Bridge(QObject):
 
         if self._is_library_empty():
             QTimer.singleShot(600, self.scanMusic)
+        # Açılış yükünü etkilememek için güncelleme kontrolü gecikmeli başlar
+        QTimer.singleShot(3500, self._start_update_check)
 
     # ================= yardımcılar =================
     def _is_library_empty(self) -> bool:
@@ -376,6 +385,7 @@ class Bridge(QObject):
         return json.dumps({
             "playlists": playlists,
             "protected": list(config.PROTECTED_PLAYLISTS),
+            "version": config.APP_VERSION,
             "current": self.library.current,
             "settings": self.library.settings,
             "presets": eqpresets.PRESETS,
@@ -941,6 +951,46 @@ class Bridge(QObject):
         self._video_handoff = 0.0
         self.engine.play()
 
+    # ---- Otomatik güncelleme (GitHub Releases → .msi) ----
+    def _start_update_check(self) -> None:
+        if self._closing:
+            return
+        t = updater.UpdateCheckThread(config.APP_VERSION, updater.is_frozen(), self)
+        t.available.connect(self._on_update_available)
+        t.progress.connect(self.updateProgressSignal)
+        t.ready.connect(self._on_update_ready)
+        t.error.connect(lambda m: None)      # ağ yok/rate-limit → sessiz
+        t.noUpdate.connect(lambda: None)
+        self._update_thread = t
+        t.start()
+
+    def _on_update_available(self, version: str, notes: str) -> None:
+        self.updateAvailableSignal.emit(version, notes)
+        if not updater.is_frozen():
+            self.toastSignal.emit(f"🔔 Yeni sürüm mevcut: v{version} (geliştirme modunda indirilmez).")
+
+    def _on_update_ready(self, msi_path: str, version: str) -> None:
+        self._staged_update = msi_path
+        self._staged_version = version
+        self.updateReadySignal.emit(version)
+        self.toastSignal.emit(f"🎉 Güncelleme indirildi (v{version}) — çıkışta otomatik kurulacak.")
+
+    def _perform_update(self) -> bool:
+        """Ayrık kurucuyu başlatır. Donmuşta çalışan exe = MSI'nin güncellediği yol."""
+        if not self._staged_update:
+            return False
+        exe = sys.executable
+        ok = updater.install_and_relaunch(self._staged_update, exe)
+        if ok:
+            self._staged_update = None
+        return ok
+
+    @pyqtSlot()
+    def installUpdateNow(self) -> None:
+        """Kullanıcı 'şimdi yeniden başlat' derse: hemen kur + yeniden aç."""
+        if self._staged_update and self._perform_update():
+            QApplication.quit()
+
     # ---- Lyrica: otomatik (zaman kodlu) şarkı sözü ----
     @pyqtSlot(str, str)
     def fetchLyrics(self, sid: str, playlist: str) -> None:
@@ -1283,3 +1333,11 @@ class Bridge(QObject):
         if self.active_download and self.active_download.isRunning():
             self.active_download.cancel()
             self.active_download.wait(5000)
+        # Güncelleme iş parçacığı hâlâ indiriyorsa kısa bekle, sonra bırak
+        if self._update_thread and self._update_thread.isRunning():
+            if not self._update_thread.wait(1500):
+                self._update_thread.terminate()
+                self._update_thread.wait(1000)
+        # İndirilmiş güncelleme varsa: ayrık kurucuyu başlat (uygulama şimdi kapanıyor)
+        if self._staged_update:
+            self._perform_update()
