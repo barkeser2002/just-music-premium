@@ -913,14 +913,13 @@ class Bridge(QObject):
         if not query:
             self.toastSignal.emit("Klip için şarkı adı gerekli.")
             return
-        self.toastSignal.emit("🎬 Klip akışı hazırlanıyor…")
-        # YouTube'dan inen parçada kayıt birebir aynı -> klip kalınan saniyeden başlasın
-        self._video_handoff = (
-            self.engine.position()
-            if (sid == self.active_song_id and song.get("source") == "youtube")
-            else 0.0
-        )
-        self.engine.pause()  # müzik dursun; klibin kendi sesi çalacak
+        self.toastSignal.emit("🎬 Klip görüntüsü hazırlanıyor…")
+        # YENİ MİMARİ: ses DSP motorundan (mp3) gelir; video SESSİZ ve motora
+        # senkron oynar. Böylece tek ses kaynağı + tüm DSP efektleri klibe de uygulanır
+        # (çift playback yok). Motoru DURDURMA; gerekiyorsa çaldır.
+        if sid == self.active_song_id and not self.engine.is_playing():
+            self.engine.play()
+        self._video_handoff = self.engine.position()   # videonun başlangıç saniyesi
         t = VideoStreamThread(sid, query, self)
         t.ready.connect(self._on_video_ready)
         t.failed.connect(self._on_video_failed)
@@ -934,22 +933,18 @@ class Bridge(QObject):
         except ValueError:
             return
         data["start"] = round(self._video_handoff, 2)
+        data["muted"] = True   # ses motordan gelir; video her zaman sessiz
         self.videoReadySignal.emit(json.dumps(data))
 
     def _on_video_failed(self, msg: str) -> None:
-        self.toastSignal.emit(msg)
-        self.engine.play()  # klip açılamadı -> müziğe dön
+        self.toastSignal.emit(msg)   # motor zaten çalıyor, ekstra işlem yok
 
     @pyqtSlot(float)
     def resumeMusic(self, pos: float = -1.0) -> None:
-        """Klip kapatılınca yerel müziğe dön; aynı kayıtsa klibin saniyesinden."""
-        if pos >= 0 and self._video_handoff > 0:
-            dur = self.engine.duration()
-            if 0 < pos < dur - 1:
-                self.engine.seek(pos)
-                self.positionChanged.emit(pos, dur)
+        """Klip kapatılınca çağrılır. Motor hiç durmadı — sadece çaldığından emin ol."""
         self._video_handoff = 0.0
-        self.engine.play()
+        if not self.engine.is_playing():
+            self.engine.play()
 
     # ---- Otomatik güncelleme (GitHub Releases → .msi) ----
     def _start_update_check(self) -> None:

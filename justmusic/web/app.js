@@ -571,15 +571,10 @@ function updatePlayer(){
   updateRepeatBtn();
 }
 function updatePlayBtn(){$('#pPlay').innerHTML=active.playing?fa('pause'):fa('play');}
-/* Alt bar hem müziği hem klibi sürer — hangisi aktifse ona gider. */
-function togglePlayback(){
-  if(clip&&clip.v){if(clip.v.paused)clip.v.play().catch(()=>{});else clip.v.pause();return;}
-  bridge.toggle();
-}
-function seekTo(sec){
-  if(clip&&clip.v){clip.v.currentTime=Math.max(0,Math.min(sec,clip.v.duration||sec));return;}
-  bridge.seek(sec);
-}
+/* Alt bar HER ZAMAN motoru sürer (ses kaynağı). Klip varsa muted video motoru
+   aynalar (playingChanged/positionChanged üzerinden). Tek kontrol noktası. */
+function togglePlayback(){bridge.toggle();}
+function seekTo(sec){bridge.seek(sec);}
 function updateSeek(pos,dur){
   if(!seeking){$('#seekFill').style.width=(dur>0?pos/dur*100:0)+'%';$('#seekKnob').style.left=(dur>0?pos/dur*100:0)+'%';}
   $('#pCur').textContent=fmt(pos);$('#pDur').textContent=fmt(dur);
@@ -603,8 +598,7 @@ function toggleShuffle(){active.shuffle=!active.shuffle;bridge.setShuffle(active
 function toggleRepeat(){active.repeat=!active.repeat;bridge.setRepeat(active.repeat);$('#pRepeat').classList.toggle('on',active.repeat);showToast(active.repeat?'Tekrar açık':'Tekrar kapalı');}
 function setVolumeUI(v){volume=v;$('#volFill').style.width=(v/150*100)+'%';
   $('#pMute').innerHTML=v===0?fa('volume-xmark'):v<55?fa('volume-low'):fa('volume-high');
-  const vb=$('#volBar');if(vb)vb.title='Ses: '+v+'%'+(v>100?' (boost)':'');
-  if(clip){const m=clip.a||clip.v;if(m)m.volume=Math.min(1,v/100);}}  // klip sesi de bara uysun
+  const vb=$('#volBar');if(vb)vb.title='Ses: '+v+'%'+(v>100?' (boost)':'');}  // ses motordan (bridge.setVolume); video hep sessiz
 function toggleMute(){if(volume>0){lastVol=volume;setVolumeUI(0);bridge.setVolume(0);muted=true;}else{setVolumeUI(lastVol||80);bridge.setVolume(lastVol||80);muted=false;}}
 
 /* ================= VISUALIZER ================= */
@@ -663,8 +657,8 @@ function refreshState(){bridge.getState(json=>{S=JSON.parse(json);active=S.activ
 function wireSignals(){
   bridge.stateChanged.connect(refreshState);
   bridge.trackChanged.connect(j=>{track=JSON.parse(j);onTrackChanged();});
-  bridge.playingChanged.connect(p=>{if(clip)return;active.playing=p;updatePlayBtn();});
-  bridge.positionChanged.connect((pos,dur)=>{if(clip)return;updateSeek(pos,dur);});  // klipteyken bar videoyu sürer
+  bridge.playingChanged.connect(p=>{active.playing=p;updatePlayBtn();if(clip)clipMirrorPlay(p);});
+  bridge.positionChanged.connect((pos,dur)=>{updateSeek(pos,dur);if(clip){syncClipVideo(pos);clipSyncLyrics(pos);}});  // motor = tek saat
   bridge.spectrumSignal.connect(j=>{try{spectrum=JSON.parse(j);}catch(e){}});
   bridge.coverReadySignal.connect((id,url)=>updateCovers(id,url));
   bridge.toastSignal.connect(showToast);
@@ -734,7 +728,7 @@ function wireEvents(){
     else showToast('Önce bir şarkı çal.');};
   $('#compactBtn').onclick=toggleCompact;
   $('#moodChip').onclick=()=>{autoMoodColor=!autoMoodColor;showToast(autoMoodColor?'Ruh haline göre renk: açık':'Ruh haline göre renk: kapalı');if(autoMoodColor&&moodData)applyAccentHex(moodData.color);};
-  $('#speedSel').onchange=e=>{speed=parseFloat(e.target.value);bridge.setSpeed(speed);};
+  $('#speedSel').onchange=e=>{speed=parseFloat(e.target.value);bridge.setSpeed(speed);if(clip&&clip.v)clip.v.playbackRate=speed;};
   $('#sleepSel').onchange=e=>{const min=parseInt(e.target.value);if(sleepTimer){clearTimeout(sleepTimer);sleepTimer=null;}
     if(min>0){sleepTimer=setTimeout(()=>{if(active.playing)bridge.toggle();showToast('Uyku zamanı — durduruldu.');$('#sleepSel').value='0';},min*60000);showToast(min+' dk sonra duracak.');}else showToast('Uyku zamanlayıcı kapalı.');};
   $('#pLyricsBtn').onclick=()=>showView('lyrics');
@@ -1002,56 +996,51 @@ function onVideoReady(json){
   showView('clip');
 }
 function buildClipMedia(d){
+  /* YENİ MİMARİ: video HER ZAMAN SESSİZ; ses DSP motorundan (mp3) gelir. Muted
+     video, motorun konumuna (positionChanged) senkronlanır ve motorun çalma
+     durumunu aynalar. Böylece TEK ses kaynağı olur (çift playback yok) ve tüm
+     DSP efektleri klibin sesine de uygulanır. Ayrı <audio> akışı YOK. */
   if(clip)stopClip(false);
   const host=el('div','clip-host');
   const v=el('video','clip-video');v.src=d.video;v.playsInline=true;v.controls=false;
+  v.muted=true;v.volume=0;                 // video=sessiz (1/0 bayrağı: clip var mı)
   host.appendChild(v);
   const lyrBox=el('div','clip-lyrics');host.appendChild(lyrBox);
-  clip={d:d,host:host,v:v,a:null,sync:null,lrc:parseLRC(track&&track.lyrics),lyrBox:lyrBox,lyrIdx:-2,mode:'full'};
+  clip={d:d,host:host,v:v,lrc:parseLRC(track&&track.lyrics),lyrBox:lyrBox,lyrIdx:-2,
+        mode:'full',ready:false,startAt:Math.max(0,+d.start||0)};
   v.onloadedmetadata=()=>{if(v.videoWidth&&v.videoHeight)host.style.setProperty('--ar',v.videoWidth+'/'+v.videoHeight);};
   v.onclick=()=>{if(clip&&clip.mode==='mini')showView('clip');else togglePlayback();};
-
-  const at0=Math.max(0,+d.start||0);      // müzikten devralınan saniye
-  if(d.audio){
-    /* YouTube muxed webm vermiyor: video VP9, ses Opus — iki ayrı akış.
-       Video saat (clock) kabul edilir, ses ona hizalanır. */
-    const a=el('audio');a.src=d.audio;a.preload='auto';v.muted=true;
-    a.volume=Math.min(1,volume/100);host.appendChild(a);clip.a=a;
-    let started=0;
-    const start=()=>{if(++started<2)return;v.currentTime=at0;a.currentTime=at0;
-      v.play().catch(()=>{});a.play().catch(()=>showToast('Ses akışı başlatılamadı.'));};
-    v.addEventListener('canplay',start,{once:true});
-    a.addEventListener('canplay',start,{once:true});
-    v.onseeked=()=>{a.currentTime=v.currentTime;};
-    v.onwaiting=()=>a.pause();                        // video buffer'da -> ses beklesin
-    v.onplaying=()=>{a.currentTime=v.currentTime;a.play().catch(()=>{});};
-    a.onerror=()=>showToast('Ses akışı yüklenemedi.');
-    clip.sync=setInterval(()=>{                       // kayma düzeltme
-      if(clip&&!v.paused&&Math.abs(a.currentTime-v.currentTime)>0.25)a.currentTime=v.currentTime;
-    },1000);
-  }else{
-    v.volume=Math.min(1,volume/100);
-    v.addEventListener('canplay',()=>{if(at0>0)v.currentTime=at0;v.play().catch(()=>{});},{once:true});
-  }
-  // Alt player bar klibi sürsün (büyük sahnede de mini modda da)
-  v.onplay=()=>{if(clip&&clip.a){clip.a.currentTime=v.currentTime;clip.a.play().catch(()=>{});}
-    active.playing=true;updatePlayBtn();};
-  v.onpause=()=>{if(clip&&clip.a)clip.a.pause();active.playing=false;updatePlayBtn();};
-  v.ontimeupdate=()=>{if(!clip)return;updateSeek(v.currentTime||0,v.duration||0);clipSyncLyrics(v.currentTime||0);};
-  v.onerror=()=>showToast('Klip akışı oynatılamadı (kodek/ağ).');
+  v.playbackRate=speed||1;                 // DSP hızıyla görsel eşleşsin
+  v.addEventListener('canplay',()=>{
+    if(!clip)return;
+    clip.ready=true;
+    try{v.currentTime=clip.startAt;}catch(e){}
+    if(active.playing)v.play().catch(()=>{});else v.pause();
+  },{once:true});
+  v.onerror=()=>showToast('Klip görüntüsü oynatılamadı (kodek/ağ).');
+}
+/* Muted videoyu motorun konumuna hizala (kayma > 0.35s ise düzelt). */
+function syncClipVideo(pos){
+  if(!clip||!clip.ready)return;
+  const v=clip.v;
+  if(Math.abs((v.currentTime||0)-pos)>0.35){try{v.currentTime=pos;}catch(e){}}
+}
+/* Muted video, motorun çal/duraklat durumunu aynalar. */
+function clipMirrorPlay(p){
+  if(!clip||!clip.ready)return;
+  if(p)clip.v.play().catch(()=>{});else clip.v.pause();
 }
 function stopClip(resume){
   const c=clip;clip=null;
   if(!c)return;
   if(c.sync)clearInterval(c.sync);
-  let at=-1;
-  /* Akışı gerçekten kes ve elementleri DOM'dan kaldır: sadece pause etmek ağ
-     trafiğini sürdürür, DOM'da kalan canlı <video> kapanışta WebEngine'i çökertiyor. */
-  if(c.v){at=c.v.currentTime||0;c.v.pause();c.v.removeAttribute('src');c.v.load();}
-  if(c.a){c.a.pause();c.a.removeAttribute('src');c.a.load();}
+  /* Video akışını gerçekten kes ve DOM'dan kaldır: sadece pause ağ trafiğini
+     sürdürür, DOM'da kalan canlı <video> kapanışta WebEngine'i çökertiyor.
+     (Ses motoru zaten çalıyor — dokunmuyoruz.) */
+  if(c.v){c.v.pause();c.v.removeAttribute('src');c.v.load();}
   if(c.host)c.host.remove();
   removeMiniClip();
-  if(bridge&&resume)bridge.resumeMusic(at);   // müzik klibin bıraktığı saniyeden
+  if(bridge&&resume)bridge.resumeMusic(-1);   // motorun çaldığından emin ol
 }
 function exitClip(){
   const wasClipView=(view==='clip');
