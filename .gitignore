@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+
+# Gömülü ikili araçlar (ffmpeg.exe ~141 MB, deno.exe ~95 MB, yt-dlp.exe ~17 MB).
+# GitHub tek dosya için 100 MB sınırı koyar; bu yüzden depoya EKLENMEZ.
+# Derlemeden önce bin/ klasörüne kendiniz indirin (bkz. README "Kurulum").
+bin/
+
+# Bilgi grafiği çıktısı (graphify ile üretilir; kaynak değil)
+graphify-out/
+
+# Yerel kütüphane / indirilen medya
+*.mp3
+*.m4a
+*.webm
+
+# logo.ico ve justmusic/assets/logo.png korunur (uygulama/derleme varlıkları)

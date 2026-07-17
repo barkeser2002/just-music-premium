@@ -1,0 +1,16 @@
+# Çalışma zamanı bağımlılıkları
+PyQt6>=6.6
+PyQt6-WebEngine>=6.6
+numpy>=1.26
+scipy>=1.11
+sounddevice>=0.4.6
+yt-dlp>=2026.7.4
+
+# Derleme (exe üretmek) için
+pyinstaller>=6.6
+
+# Notlar:
+# - Arama/indirme yt-dlp'nin PYTHON kütüphanesiyle yapılır (exe değil).
+# - bin/ içinde gömülü: ffmpeg.exe (çözümleme/mp3) ve deno.exe (YouTube nsig/JS
+#   çözümü — yt-dlp bunu PATH'te bulur; config.py PATH'e ekler).
+# - Arayüz web (HTML/CSS/JS) olarak justmusic/web/ altındadır.

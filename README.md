@@ -1,0 +1,175 @@
+# 🎵 Just Music Premium
+
+Windows için profesyonel müzik çalar. **Spotify tarzı web arayüzü (QtWebEngine)**
++ **yerli DSP ses motoru** (gerçek zamanlı EQ & efektler) + **gömülü yt-dlp/ffmpeg**.
+
+<img src="justmusic/assets/logo.png" alt="Just Music logo" width="120">
+
+## 📸 Ekran Görüntüleri
+
+**Klip modu** — ekranı kaplamaz, ana alana gömülür; zaman kodlu sözler klibin üstünde senkron akar:
+
+![Klip modu](docs/clip-mode.png)
+
+**Kalıcı mini oynatıcı** — sekme değiştirince klip köşeye iner ve çalmaya devam eder (akış kesilmez):
+
+![Mini oynatıcı](docs/mini-player.png)
+
+## 🏗 Mimari
+
+- **Arayüz:** HTML/CSS/JS (`justmusic/web/`), `QWebEngineView` içinde render edilir →
+  gerçek Spotify seviyesi görsel (gradyan başlıklar, kartlar, animasyonlar).
+- **Ses & tüm mantık:** yerli Python (`engine.py` DSP motoru, `library.py`,
+  `downloader.py`, `covers.py`, `naming.py`). Arayüz ↔ Python **QWebChannel**
+  köprüsüyle konuşur (`bridge.py`).
+- **Sunucu / port YOK:** her şey in-process. Varlıklar ve kapaklar özel `app://`
+  şemasıyla servis edilir (`scheme.py`). Eski pywebview sürümündeki port
+  çakışması / sonsuz kilitlenme burada imkânsız.
+
+## ✨ Özellikler
+
+- **Spotify düzeni:** üstte arama, solda kütüphane (kapaklı çalma listeleri),
+  ortada gradyanlı liste görünümü + sütunlu şarkı tablosu, sağda "çalınıyor"
+  paneli, altta player bar, ana sayfa kartları, şarkı sözleri görünümü.
+- **Gerçek DSP ses motoru** (numpy/scipy + sounddevice): **30 EQ preset** +
+  **10 bant özel EQ** + **🤖 Oto EQ** + efekt paneli (Preamp, Bass Boost, Echo,
+  Reverb, **8D Spatial**) — çalarken anında. **Gerçek FFT görselleştirici**.
+- **yt-dlp Python kütüphanesi** + gömülü `ffmpeg.exe`/`deno.exe`: kurulum
+  gerekmez. **Ara → 20 sonucu
+  kapaklarıyla gör → seç → toplu indir**; ya da bağlantı yapıştır → direkt mp3.
+- **Akıllı isim & kapak:** dağınık MP3 adları temizlenip "Sanatçı - Başlık"a
+  ayrıştırılır, bu temiz adla YouTube kapağı çekilir. "🖼 İsim & Kapak" ile toplu
+  senkron.
+- **Otomatik kütüphane:** `~/Music` taranır, her alt klasör bir çalma listesi.
+- **Kuyruk (Sıradaki):** sıraya ekle / sıradaki çal, kuyruk sayfası.
+- **Tam ekran "Şimdi Çalıyor":** kapak renginden gradyan + canlı görselleştirici.
+- **İstatistik sayfası:** toplam parça/liste/süre + en çok dinlenenler (grafik).
+- **Genel arama:** kütüphanede anında arar (şarkı+liste), Enter → YouTube indirme.
+- **Kapak mozaiği** (2×2), **özel vurgu rengi** seçici, **gerçek şarkı süreleri**
+  (ffmpeg ile), **indirme göstergesi**, **sürükle-bırak ile listeye ekleme**,
+  **klavye kısayolları penceresi**, alt bar mini görselleştirici.
+- **Premium tipografi:** gömülü Sora (başlıklar) + Manrope (gövde) fontları.
+
+### 🚀 Çağ açıcı (bize özel DSP) özellikler
+- **🎙 Karaoke / Vokal Azaltma:** gerçek zamanlı merkez-kanal iptaliyle vokali kısar.
+- **🌈 Ruh Hali Motoru:** sesin enerji + parlaklığını analiz edip parçanın "ruh
+  halini" (Enerjik/Sakin/Güçlü…) bulur, isteğe bağlı arayüz rengini ona uydurur.
+- **🌊 Şarkı DNA'sı:** parçanın tüm dalga formu (SoundCloud tarzı) — tıklayarak seek.
+- **🔁 A-B Döngü / Pratik Modu:** iki nokta arasında döngü (öğrenmek/çalışmak için).
+- **💡 Ambiyans Işığı:** pencere kenarları müziğin rengi + bası ile titreşir.
+- **🌊 Odak Sesleri:** DSP ile üretilen yağmur / beyaz / kahverengi gürültü
+  (müzikle veya tek başına — odak/uyku için).
+- **🎬 Klip Modu (akış — indirme yok):** alt bardaki film tuşu, çalan parçanın
+  klibini **yt-dlp ile çözüp internetten oynatır** (`playVideo` → `VideoStreamThread`).
+  Ekranı kaplamaz: Spotify gibi ana alana gömülür, kenar çubuğu + alt bar durur
+  ve alt bar klibi sürer (oynat/duraklat, seek, ses). **"Sese geç"** ile müziğe
+  dönülür — müzik varsayılan dinleme biçimidir. Zaman kodlu sözler varsa
+  **klibin üstünde senkron** akar. YouTube'dan inen parçalarda kayıt birebir aynı
+  olduğu için **konum iki yönde devredilir** (müziğin 40. sn'si → klip 40. sn'den).
+  - **Kalıcı mini oynatıcı:** klip açıkken **sekme/menü değiştirmek akışı KESMEZ** —
+    video, YouTube/Spotify gibi köşedeki bir **mini oynatıcıya** iner ve çalmaya
+    devam eder; film tuşuna basınca yeniden büyür. Video/ses elementleri bir kez
+    kurulup DOM'da yalnızca **taşınır** (yeniden yaratılmaz), böylece yt-dlp'yi her
+    seferinde tekrar beklemek gerekmez.
+  - Not: QtWebEngine H.264/AAC oynatamaz ve YouTube muxed webm vermez → VP9 video +
+    Opus ses **ayrı akış** olarak gelir ve arayüzde senkron tutulur.
+
+Ayrıca: 3 durumlu tekrar, liste sıralama, kompakt mod, dosya konumunu aç,
+kalp animasyonu ve daha fazlası. Ses işleme tamamen yerli `DspEngine`'de.
+
+### 🎤 Otomatik şarkı sözleri (Lyrica API)
+- Bir parça çalınca sözü yoksa **otomatik** olarak
+  [Lyrica](https://test-0k.onrender.com/) servisinden çekilir
+  (`/lyrics/?artist=…&song=…&timestamps=true&fast=true`).
+- Sözler **zaman kodlu (LRC)** gelir → satırlar çalarken **senkron vurgulanır**,
+  satıra tıklayınca o ana atlar. Sanatçı bilgisi yoksa önce `/suggestion` ile bulunur.
+- Sağ paneldeki **"Getir"** butonuyla elle de çekilebilir; kaynak (lrclib,
+  Genius, Musixmatch…) bildirilir. Sözler kütüphaneye kaydedilir.
+
+### 🧬 Daha da radikal (analiz + üretim)
+- **BPM/tempo tespiti**, **ses eşitleme (loudness normalize)**, **spektrogram**,
+  **zaman kodlu (LRC) şarkı sözleri** senkronu, **Komut Paleti (Ctrl+K)**,
+  **Ruh Hali Radyosu**, **reverb ortam presetleri** (Oda/Salon/Katedral…),
+  **parça kırpma & dışa aktarma** (A-B ile), **akıllı çalma listeleri**.
+- Ayrıca: liste içi **sürükle-sırala**, **özel liste kapağı**, **M3U dışa aktar**,
+  **tekrarları kaldır**, **tümünü kuyruğa ekle**, 12 tema, sıradaki önizleme.
+
+### 🔧 İndirme mimarisi (ve düzeltmesi)
+- Arama/indirme **yt-dlp'nin PYTHON kütüphanesiyle** yapılır (exe değil):
+  gerçek ilerleme kancaları, dönüşüm sonrası **kesin dosya yolu**
+  (`requested_downloads[].filepath`) ve anlaşılır hatalar.
+- Modern yt-dlp, YouTube `nsig` korumasını çözmek için bir **JS çalışma zamanı**
+  ister → **Deno** (`bin/deno.exe`) gömüldü; `config.py` `bin/`'i sürecin
+  PATH'ine ekler, kütüphane Deno'yu otomatik bulur.
+- Sonuç: "sonuç bulunamadı / indirme başarısız" giderildi (gerçek müzik videosu
+  indirmesiyle doğrulandı).
+
+### 🎨 İkonlar
+Emoji tuşlar **FontAwesome** (gömülü) ile değiştirildi — renk ve arka plan
+tema ile kontrol edilebilir.
+- Sürükle-bırak, favoriler, künye düzenleme, listeler arası kopyalama, hız
+  (0.5x–2x), ses boost (100+), uyku zamanlayıcı, 6 tema, JSON yedek.
+- Klavye: `Boşluk` · `←/→` 10 sn · `↑/↓` ses · `S` karışık · `L` tekrar · `N/P`.
+
+Veriler `~/Music/JustMusic/` altında (`library.json`, `downloads/`, `covers/`).
+
+## 🛠 Kullanılan Araçlar
+
+| Katman | Araç | Neden |
+|--------|------|-------|
+| **Arayüz kabuğu** | [PyQt6](https://pypi.org/project/PyQt6/) + **PyQt6-WebEngine** (`QWebEngineView`, `QWebChannel`) | Chromium tabanlı web arayüzü + JS↔Python köprüsü, sunucusuz |
+| **Web arayüzü** | Saf **HTML/CSS/JS** (framework yok) | Spotify seviyesi görsel, tam kontrol |
+| **Ses motoru** | [NumPy](https://numpy.org/) · [SciPy](https://scipy.org/) (`sosfilt`, `lfilter`) · [sounddevice](https://python-sounddevice.readthedocs.io/) | Gerçek zamanlı DSP: EQ, efektler, karaoke, FFT — `QMediaPlayer`'ın yapamadığı |
+| **İndirme** | [yt-dlp](https://github.com/yt-dlp/yt-dlp) (**Python kütüphanesi**) | İlerleme kancaları + kesin dosya yolu + anlaşılır hata |
+| **Kod çözme / MP3** | [FFmpeg](https://ffmpeg.org/) (gömülü `ffmpeg.exe`) | Her biçimi f32 PCM'e çöz, mp3 dönüştür |
+| **JS çalışma zamanı** | [Deno](https://deno.com/) (gömülü `deno.exe`) | YouTube `nsig` korumasını çözmek için şart |
+| **Şarkı sözleri** | [Lyrica API](https://test-0k.onrender.com/) | Zaman kodlu (LRC) senkron sözler |
+| **İkonlar** | [Font Awesome Free](https://fontawesome.com/) (gömülü, çevrimdışı) | SVG ikon — rengi/arka planı tema ile değişir |
+| **Tipografi** | [Sora](https://fonts.google.com/specimen/Sora) + [Manrope](https://fonts.google.com/specimen/Manrope) (gömülü) | Başlık + gövde fontları (latin-ext = Türkçe) |
+| **Paketleme** | [PyInstaller](https://pyinstaller.org/) | Tek `dist\JustMusic\` klasörü (WebEngine + bin + web gömülü) |
+| **Logo** | [OpenRouter](https://openrouter.ai/) → Google **Nano Banana Pro** (Gemini Image) | `logo.png` + `logo.ico` üretimi |
+
+> Ses **tarayıcıda değil**, tamamen yerli `DspEngine`'de (sounddevice) çalınır;
+> QtWebEngine yalnızca görseldir. Böylece EQ/efekt kalitesi ve "sunucu yok" garantisi korunur.
+
+## 🧩 Kurulum & Çalıştırma
+
+```bat
+setup.bat      REM .venv + bağımlılıklar (PyQt6, PyQt6-WebEngine, numpy, scipy, sounddevice, yt-dlp)
+run.bat        REM çalıştır
+build.bat      REM dist\JustMusic\JustMusic.exe üret (~880 MB; WebEngine+ffmpeg gömülü)
+```
+
+> **Gömülü ikili araçlar depoda yok** (GitHub 100 MB/dosya sınırı). Çalıştırmadan
+> önce `bin/` klasörüne şunları koyun: **`ffmpeg.exe`** ([indir](https://www.gyan.dev/ffmpeg/builds/)),
+> **`yt-dlp.exe`** ([indir](https://github.com/yt-dlp/yt-dlp/releases)),
+> **`deno.exe`** ([indir](https://github.com/denoland/deno/releases)).
+> (yt-dlp Python kütüphane olarak da `requirements.txt` üzerinden kurulur; `bin/`'deki
+> exe yalnızca yedektir. `ffmpeg` ve `deno` zorunludur.)
+
+## 📁 Yapı
+
+```
+main.py                # QtWebEngine giriş noktası (şema + köprü + pencere)
+justmusic/
+  bridge.py            # JS↔Python köprüsü (KONTROLÖR): ses, kütüphane, indirme, EQ
+  scheme.py            # app:// özel şema (web varlıkları + kapaklar)
+  engine.py            # DSP motoru (EQ+efekt+hız+FFT) — projenin kalbi
+  eqpresets.py         # 30 EQ profili + bant/efekt tanımları
+  library.py           # veri modeli + JSON + müzik klasörü tarama
+  downloader.py        # yt-dlp PYTHON kütüphanesi ile indirme (+ffmpeg mp3)
+  covers.py            # yt-dlp PYTHON kütüphanesi ile kapak arama/önbellek
+  naming.py            # MP3 adı temizleme
+  config.py            # yollar, gömülü bin/web çözümleme
+  web/                 # index.html, app.css, app.js, qwebchannel.js + fontawesome/ + fonts/
+  assets/logo.png
+bin/ffmpeg.exe  bin/deno.exe  bin/yt-dlp.exe   # depoda YOK — kendiniz indirin (deno: nsig/JS çözümü)
+docs/                  # README ekran görüntüleri
+setup.bat  run.bat  build.bat  build.py  requirements.txt
+```
+
+## ℹ️ Not
+
+Ses **tarayıcıda değil**, tamamen yerli `DspEngine`'de (sounddevice) çalınır;
+QtWebEngine yalnızca görseldir. Hız artışı pitch'i değiştirir (nightcore); reverb
+çok-taplı "oda" hissidir.
