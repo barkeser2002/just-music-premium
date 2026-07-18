@@ -50,7 +50,18 @@ img{display:block}
 .topbar-right{display:flex;align-items:center;gap:8px;margin-left:auto}
 .chip-btn{background:rgba(0,0,0,.5);border:1px solid #333;border-radius:20px;padding:8px 14px;font-size:12px;color:#eee;transition:.15s;white-space:nowrap}
 .chip-btn:hover{border-color:var(--accent);background:#1f1f1f}
-.mini-sel{background:var(--panel2);color:#fff;border:none;border-radius:16px;padding:6px 8px;font-size:12px;outline:none;cursor:pointer}
+/* Native <select> → tamamen özel görünüm (varsayılan tarayıcı oku kaldırıldı,
+   kendi chevron'umuz + hover/focus + option renkleri). */
+.mini-sel{appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  background-color:var(--panel2);color:#fff;border:1px solid transparent;border-radius:16px;
+  padding:6px 26px 6px 12px;font-size:12px;font-weight:600;font-family:inherit;outline:none;cursor:pointer;
+  transition:.15s;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23a7a7ad' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center}
+.mini-sel:hover{background-color:var(--card-h);border-color:#3a3a3a}
+.mini-sel:focus-visible{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.35)}
+.mini-sel option{background:#1a1b1e;color:#fff;font-weight:600}
+.mini-sel::-ms-expand{display:none}
 
 /* ---------- GÖVDE ---------- */
 .body{flex:1;display:flex;gap:8px;padding:0 8px 8px;min-height:0}
@@ -145,10 +156,17 @@ img{display:block}
 .search-results{padding:8px 28px 30px}
 .sr-toolbar{display:flex;align-items:center;gap:14px;margin:8px 0 16px}
 .sr-toolbar .count{color:var(--muted);font-size:13px}
-.sr-row{display:grid;grid-template-columns:28px 56px 1fr 70px;gap:12px;align-items:center;padding:8px;border-radius:8px;cursor:pointer;transition:.1s}
+.sr-row{display:grid;grid-template-columns:28px 56px 1fr 64px 40px;gap:12px;align-items:center;padding:8px;border-radius:8px;cursor:pointer;transition:.12s}
 .sr-row:hover{background:#242424}
+.sr-row:hover .sr-dlbtn{background:var(--accent);color:#000}
 .sr-row img{width:56px;height:42px;border-radius:4px;object-fit:cover;background:#333}
 .sr-check{width:20px;height:20px;accent-color:var(--accent);cursor:pointer}
+.sr-dlbtn{width:34px;height:34px;border:none;border-radius:50%;background:var(--card-h);color:#fff;font-size:13px;
+  cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:.15s;justify-self:center}
+.sr-dlbtn:hover{transform:scale(1.12)}
+.sr-row.done{opacity:.6}
+.sr-row.done .sr-dlbtn{background:var(--accent);color:#000}
+@media(max-width:640px){.sr-row{grid-template-columns:24px 46px 1fr 40px;gap:8px}.sr-dur{display:none}}
 .sr-title{font-size:14px;font-weight:600;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sr-sub{font-size:12px;color:var(--muted);margin-top:2px}
 .sr-dur{color:var(--muted);font-size:12px;text-align:right}
@@ -229,12 +247,28 @@ img{display:block}
   .p-left{gap:9px}
   .p-controls{gap:16px}
 }
-@media(max-width:1060px){
-  .p-right{gap:5px}
+@media(max-width:1140px){
+  .p-right{gap:6px}
   .p-right .icon-btn{font-size:16px;padding:3px}
-  .p-right .mini-sel{padding:5px 6px;font-size:11px}
-  .p-center{width:min(36vw,400px)}
-  .vol{width:78px}
+  .p-right .mini-sel{padding:5px 22px 5px 9px;font-size:11px}
+  .p-center{width:min(34vw,400px)}
+  .p-controls{gap:14px}
+  .vol{width:76px}
+  #sleepSel{display:none}                       /* uyku zamanlayıcı (niş) gizle */
+}
+@media(max-width:1010px){
+  #pAmbient,#pFsBtn,#pPanelBtn{display:none}    /* niş kontroller: ambiyans, tam ekran, panel */
+  .p-right{gap:5px}
+  .vol{width:62px}
+  .p-cover{width:46px;height:46px}
+  .topbar-right #backupBtn{display:none}
+}
+@media(max-width:900px){
+  #speedSel,#pQueueBtn{display:none}            /* hız + kuyruk (menüden erişilebilir) */
+  .p-center{width:min(40vw,320px)}
+  .p-controls{gap:10px}
+  .topbar-right #helpBtn,.topbar-right #compactBtn{display:none}
+  .chip-btn{padding:7px 10px}
 }
 .vol{position:relative;width:100px;height:5px;background:#4d4d4d;border-radius:3px;cursor:pointer}
 .vol-fill{position:absolute;left:0;top:0;bottom:0;width:70%;background:#b3b3b3;border-radius:3px}

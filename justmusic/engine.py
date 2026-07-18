@@ -351,6 +351,37 @@ class DspEngine:
             self.playing = autoplay
             self._reset_filter_state()
 
+    def swap_source(self, path: str) -> None:
+        """Aynı parçanın alternatif kaynağına geç (ör. htdemucs enstrümantal/vokal
+        stem) — KONUMU ve çalma durumunu KORU. Karaoke/akapella için kesintisiz geçiş.
+        (load() konumu sıfırlar; bu onu korur.)"""
+        self._gen += 1
+        gen = self._gen
+        self.load_error = ""
+        with self._lock:
+            keep_pos = self.pos
+            was_playing = self.playing
+        threading.Thread(target=self._swap_worker,
+                         args=(path, gen, keep_pos, was_playing), daemon=True).start()
+
+    def _swap_worker(self, path: str, gen: int, keep_pos: float, was_playing: bool) -> None:
+        try:
+            audio = decode_audio(path)
+        except Exception as exc:
+            if gen == self._gen:
+                self.load_error = str(exc)
+            return
+        if gen != self._gen:
+            return  # bu arada başka parça yüklendi
+        with self._lock:
+            self.audio = audio
+            self.current_path = path
+            n = audio.shape[0]
+            self.pos = float(np.clip(keep_pos, 0, max(0, n - 1)))
+            self._at_end = False
+            self.playing = was_playing
+            self._reset_filter_state()
+
     def _reset_filter_state(self) -> None:
         self._zi = np.zeros((self._sos.shape[0], 2, 2))
         self._bass_zi = np.zeros((1, 2, 2))

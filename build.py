@@ -30,6 +30,16 @@ def main() -> int:
         "--collect-all", "yt_dlp",                # yt-dlp PYTHON kütüphanesi
         "--collect-all", "certifi",               # https sertifikaları
         "--collect-all", "PyQt6.QtWebEngineCore",  # WebEngine runtime/process/resources
+        # Stüdyo karaoke (htdemucs / CPU): torch + demucs ve yerel bağımlılıkları.
+        # Not: torchaudio GEREKMEZ (demucs 4.x ses G/Ç için sphn kullanır).
+        "--collect-all", "torch",
+        "--collect-all", "demucs",
+        "--collect-all", "julius",
+        "--collect-all", "einops",
+        "--collect-all", "lameenc",
+        "--collect-all", "safetensors",
+        "--collect-all", "sphn",
+        "--collect-all", "huggingface_hub",
         # gömülü ikili dosyalar
         "--add-binary", f"{os.path.join(here, 'bin', 'ffmpeg.exe')}{sep}bin",
         "--add-binary", f"{os.path.join(here, 'bin', 'yt-dlp.exe')}{sep}bin",

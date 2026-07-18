@@ -15,7 +15,7 @@ import sys
 from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QApplication, QFileDialog
 
-from . import config, engine as engine_mod, eqpresets, naming, updater
+from . import config, engine as engine_mod, eqpresets, naming, separation, updater
 from .covers import CoverFetcher
 from .downloader import DownloadThread
 from .engine import DspEngine
@@ -265,6 +265,8 @@ class Bridge(QObject):
     updateAvailableSignal = pyqtSignal(str, str)  # sürüm, notlar
     updateProgressSignal = pyqtSignal(float)      # indirme yüzdesi
     updateReadySignal = pyqtSignal(str)           # sürüm (indirildi, çıkışta kurulur)
+    separationProgressSignal = pyqtSignal(float, str)  # yüzde, durum (htdemucs)
+    karaokeModeSignal = pyqtSignal(str)           # off/quick/instrumental/vocals
 
     def __init__(self, window=None, parent=None) -> None:
         super().__init__(parent)
@@ -311,6 +313,10 @@ class Bridge(QObject):
         self._staged_update = None    # kurulacak .msi yolu (indirildiyse)
         self._staged_version = ""
         self._update_thread = None
+        self._sep_thread = None       # htdemucs ayırma iş parçacığı
+        self._karaoke_mode = "off"    # off/quick/instrumental/vocals
+        self._sep_song_id = None      # ayırmanın hedef parçası
+        self._sep_target = "off"      # ayırma bitince uygulanacak mod
 
         self._apply_audio_settings()
         self.poll = QTimer(self)
@@ -376,8 +382,9 @@ class Bridge(QObject):
             self._proofed = True
             try:
                 import tempfile
+                # donmuş derlemede torch/demucs gerçekten yüklenebiliyor mu da kanıtla
                 with open(os.path.join(tempfile.gettempdir(), "jm_web_proof.txt"), "w") as f:
-                    f.write("ui-loaded")
+                    f.write(f"ui-loaded demucs={separation.demucs_available()}")
             except Exception:
                 pass
         playlists = {name: [self._song_view(s) for s in songs]
@@ -400,6 +407,8 @@ class Bridge(QObject):
             "stats": self.library.stats,
             "recent": self._recent_views(),
             "favoritesName": config.FAVORITES_PLAYLIST,
+            "demucs": separation.demucs_available(),   # stüdyo karaoke motoru var mı
+            "karaokeMode": self._karaoke_mode,
         })
 
     def _recent_views(self) -> list:
@@ -444,6 +453,14 @@ class Bridge(QObject):
         self._cur_gain = float(song.get("lgain", 1.0))  # ses eşitleme (varsa önbellek)
         self._apply_norm_gain()
         self.engine.load(song["path"], autoplay=True)
+        # yeni parça: karaoke/stem modunu sıfırla (orijinal yüklendi)
+        if self._sep_thread and self._sep_thread.isRunning():
+            self._sep_thread.cancel()
+        if self._karaoke_mode != "off":
+            self._karaoke_mode = "off"
+            self._sep_target = "off"
+            self.engine.set_effect("karaoke", 0)
+            self.karaokeModeSignal.emit("off")
         self._maybe_fetch_cover(song)
         if not song.get("lyrics"):
             self._start_lyrics(song)  # Lyrica'dan otomatik (zaman kodlu) söz
@@ -801,6 +818,82 @@ class Bridge(QObject):
     def setEffect(self, name: str, val: float) -> None:
         self.engine.set_effect(name, val)
         self.library.settings.setdefault("effects", {})[name] = val
+
+    # ================= karaoke / vokal ayırma (htdemucs) =================
+    @pyqtSlot(str)
+    def setKaraoke(self, mode: str) -> None:
+        """Karaoke/akapella modu:
+          off          — normal (stem yok, mid-side kapalı)
+          quick        — anında mid-side vokal azaltma (motor gerektirmez)
+          instrumental — htdemucs ile vokalsiz karışım (stüdyo karaoke)
+          vocals       — htdemucs ile sadece vokal (akapella)
+        htdemucs CPU'da yavaştır (birkaç dk); stem'ler önbelleğe alınır → sonra anında."""
+        song = (self.library.find_song(self.play_list_name, self.active_song_id)
+                if self.active_song_id else None)
+        # stem modunda mid-side'ı üst üste bindirme
+        if mode != "quick":
+            self.engine.set_effect("karaoke", 0)
+
+        if mode in ("off", "quick"):
+            self._karaoke_mode = mode
+            self._sep_target = "off"
+            if song and self.engine.current_path != song["path"]:
+                self.engine.swap_source(song["path"])   # stem'den orijinale dön
+            if mode == "quick":
+                self.engine.set_effect("karaoke", 85)
+                self.toastSignal.emit("⚡ Hızlı karaoke açık (mid-side)")
+            self.karaokeModeSignal.emit(mode)
+            return
+
+        # instrumental / vocals -> htdemucs
+        if not song:
+            self.toastSignal.emit("Önce bir şarkı çal.")
+            return
+        if not separation.demucs_available():
+            self.engine.set_effect("karaoke", 85)   # motor yoksa hızlıya düş
+            self._karaoke_mode = "quick"
+            self.karaokeModeSignal.emit("quick")
+            self.toastSignal.emit("Stüdyo karaoke motoru yok — hızlı karaoke açıldı.")
+            return
+
+        self._sep_song_id = self.active_song_id
+        self._sep_target = mode
+        cached = separation.cached_stems(song["path"])
+        if cached:
+            self._apply_stem(cached["no_vocals"] if mode == "instrumental" else cached["vocals"], mode)
+            return
+        self.toastSignal.emit("🎤 Vokaller ayrılıyor… (CPU, birkaç dk sürebilir)")
+        self.separationProgressSignal.emit(1.0, "Başlıyor…")
+        if self._sep_thread and self._sep_thread.isRunning():
+            self._sep_thread.cancel()
+        t = separation.SeparationThread(song["path"], self)
+        t.progress.connect(self.separationProgressSignal)
+        t.done.connect(self._on_separation_done)
+        t.failed.connect(self._on_separation_failed)
+        self._sep_thread = t
+        t.start()
+
+    def _apply_stem(self, stem_path: str, mode: str) -> None:
+        self.engine.swap_source(stem_path)
+        self._karaoke_mode = mode
+        self.karaokeModeSignal.emit(mode)
+        self.toastSignal.emit("🎙 Akapella — sadece vokal" if mode == "vocals"
+                              else "🎤 Karaoke — enstrümantal (vokal ayrıldı)")
+
+    def _on_separation_done(self, no_vocals: str, vocals: str) -> None:
+        self.separationProgressSignal.emit(100.0, "Hazır")
+        if self.active_song_id != self._sep_song_id:
+            self.toastSignal.emit("🎤 Vokal ayırma hazır (parça değişmiş).")
+            return
+        mode = self._sep_target
+        if mode in ("instrumental", "vocals"):
+            self._apply_stem(no_vocals if mode == "instrumental" else vocals, mode)
+
+    def _on_separation_failed(self, msg: str) -> None:
+        self.separationProgressSignal.emit(100.0, "")
+        self.toastSignal.emit(msg)
+        self._karaoke_mode = "off"
+        self.karaokeModeSignal.emit("off")
 
     # ================= çalma listeleri =================
     @pyqtSlot(str)
@@ -1318,6 +1411,12 @@ class Bridge(QObject):
         for lt in list(self._lyric_threads):
             try:
                 lt.wait(3000)
+            except Exception:
+                pass
+        if self._sep_thread and self._sep_thread.isRunning():
+            try:
+                self._sep_thread.cancel()
+                self._sep_thread.wait(8000)
             except Exception:
                 pass
         for vt in list(self._video_threads):

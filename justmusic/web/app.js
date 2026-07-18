@@ -405,25 +405,37 @@ function renderSearchRows(){
   if(!searchRows.length){if(info)info.textContent='Sonuç yok.';return;}
   if(info)info.style.display='none';
   const tb=el('div','sr-toolbar');
-  const cnt=el('span','count',searchRows.length+' sonuç — indirmek istediklerini seç');
+  const cnt=el('span','count',searchRows.length+' sonuç — satıra tıkla anında indir, ya da seçip toplu indir');
   const selAll=el('button','btn','☑ Tümünü Seç');
   const dl=el('button','btn accent','⬇ Seçilenleri İndir');
   tb.append(selAll,cnt);tb.append(dl);tb.style.justifyContent='space-between';res.appendChild(tb);
+  const markDone=(row)=>{row.classList.add('done');const b=row.querySelector('.sr-dlbtn');if(b){b.innerHTML=fa('check');b.title='İndirmeye eklendi';}};
+  const startOne=(r,row)=>{                         // tek tıkla ANINDA indir
+    if(row.classList.contains('done'))return;
+    markDone(row);
+    bridge.downloadUrls(JSON.stringify([r.url]));
+    showToast('“'+(r.title||'Parça').slice(0,42)+'” indirmeye eklendi.');
+  };
   searchRows.forEach((r,i)=>{
     const row=el('div','sr-row');
-    const chk=el('input','sr-check');chk.type='checkbox';chk.dataset.i=i;
+    const chk=el('input','sr-check');chk.type='checkbox';chk.dataset.i=i;chk.title='Toplu indirme için seç';
     const im=el('img');im.src=r.thumbnail;im.onerror=()=>{im.onerror=null;im.src=PLACEHOLDER;};
     const txt=el('div');txt.appendChild(el('div','sr-title',r.title));
     txt.appendChild(el('div','sr-sub',(r.uploader||'YouTube')+(r.duration_ms?'  ·  '+fmtMs(r.duration_ms):'')));
     const dur=el('div','sr-dur',r.duration_ms?fmtMs(r.duration_ms):'');
-    row.append(chk,im,txt,dur);
-    row.onclick=e=>{if(e.target!==chk)chk.checked=!chk.checked;};
+    const dlb=el('button','sr-dlbtn');dlb.innerHTML=fa('download');dlb.title='Hemen indir';
+    row.append(chk,im,txt,dur,dlb);
+    chk.onclick=e=>e.stopPropagation();             // checkbox yalnızca seçim
+    dlb.onclick=e=>{e.stopPropagation();startOne(r,row);};
+    row.onclick=e=>{if(e.target===chk)return;startOne(r,row);};   // satıra tıkla → anında indir
     res.appendChild(row);
   });
   selAll.onclick=()=>{const cs=res.querySelectorAll('.sr-check');const all=[...cs].every(c=>c.checked);cs.forEach(c=>c.checked=!all);};
   dl.onclick=()=>{
+    const rows=[...res.querySelectorAll('.sr-check')].filter(c=>c.checked).map(c=>c.closest('.sr-row'));
     const urls=[...res.querySelectorAll('.sr-check')].filter(c=>c.checked).map(c=>searchRows[+c.dataset.i].url);
-    if(!urls.length){showToast('Hiçbir şey seçmedin.');return;}
+    if(!urls.length){showToast('Hiçbir şey seçmedin — istersen satıra tıklayıp tek tek de indirebilirsin.');return;}
+    rows.forEach(markDone);
     bridge.downloadUrls(JSON.stringify(urls));showToast(urls.length+' parça indirme kuyruğuna eklendi.');
   };
 }
@@ -644,6 +656,7 @@ function initFromState(){
   eqGains=(st.eq_gains&&st.eq_gains.length===10)?st.eq_gains.slice():new Array(10).fill(0);
   effects=Object.assign({},S.effectDefaults,st.effects||{});
   active=S.active||active;
+  onKaraokeMode(S.karaokeMode||'off');
   renderSidebar();showView('home');updatePlayer();
   $('#rightPanel').classList.add('show');$('#pPanelBtn').classList.add('active');renderRightPanel();
   bridge.requestSidebarCovers();
@@ -673,6 +686,8 @@ function wireSignals(){
   bridge.updateAvailableSignal.connect((v,notes)=>{updateInfo={version:v,notes:notes};});
   bridge.updateProgressSignal.connect(p=>onUpdateProgress(p));
   bridge.updateReadySignal.connect(v=>onUpdateReady(v));
+  bridge.separationProgressSignal.connect((pct,status)=>updateSepPill(pct,status));
+  bridge.karaokeModeSignal.connect(m=>onKaraokeMode(m));
 }
 
 /* ================= OTOMATİK GÜNCELLEME ================= */
@@ -721,7 +736,7 @@ function wireEvents(){
   $('#pFav').onclick=()=>{if(track&&!track.none)bridge.toggleFavorite(track.id,track.playlist);};
   $('#pMute').onclick=toggleMute;
   $('#pAmbient').onclick=toggleAmbient;
-  $('#pKaraoke').onclick=toggleKaraoke;
+  $('#pKaraoke').onclick=e=>{e.stopPropagation();openKaraokeMenu();};  // global tıkla-kapat menüyü hemen kapatmasın
   $('#pVideo').onclick=()=>{
     if(clip){if(view==='clip')showView(clipPrevView||'home');else showView('clip');}  // büyüt/küçült
     else if(track&&!track.none)bridge.playVideo(track.id,track.playlist);
@@ -970,9 +985,39 @@ function cycleRepeat(){const m=((active.repeat_mode==null?1:active.repeat_mode)+
   showToast(['Tekrar kapalı','Listeyi tekrarla','Parçayı tekrarla'][m]);}
 function updateRepeatBtn(){const b=$('#pRepeat');const m=active.repeat_mode==null?1:active.repeat_mode;
   b.innerHTML=fa('repeat')+(m===2?'<span class="rep1">1</span>':'');b.classList.toggle('on',m!==0);}
-let karaokeOn=false;
-function toggleKaraoke(){karaokeOn=!karaokeOn;effects.karaoke=karaokeOn?85:0;bridge.setEffect('karaoke',effects.karaoke);
-  $('#pKaraoke').classList.toggle('on',karaokeOn);showToast(karaokeOn?'Karaoke açık (vokal azaltıldı)':'Karaoke kapalı');}
+/* ---- Karaoke / vokal ayırma (htdemucs, CPU) + hızlı mid-side ---- */
+let karaokeMode='off';   // off / quick / instrumental / vocals
+function openKaraokeMenu(){
+  const b=$('#pKaraoke');const r=b.getBoundingClientRect();
+  const has=S&&S.demucs;
+  const dot=m=>karaokeMode===m?'● ':'';
+  const eng=has?'':' · motor yok, hızlıya düşer';
+  ctxMenu(r.left,r.top,[
+    {label:'🎤 Vokal / Karaoke'},
+    {text:dot('instrumental')+'Enstrümantal — vokalleri ayır (htdemucs)'+eng,fn:()=>bridge.setKaraoke('instrumental')},
+    {text:dot('vocals')+'Akapella — sadece vokal (htdemucs)'+eng,fn:()=>bridge.setKaraoke('vocals')},
+    {text:dot('quick')+'⚡ Hızlı karaoke (anında · mid-side)',fn:()=>bridge.setKaraoke('quick')},
+    {sep:true},
+    {text:dot('off')+'✕ Kapat',fn:()=>bridge.setKaraoke('off')},
+  ]);
+}
+function onKaraokeMode(mode){
+  karaokeMode=mode;
+  const b=$('#pKaraoke');if(!b)return;
+  b.classList.toggle('on',mode!=='off');
+  b.title=({off:'Karaoke / vokal ayır (htdemucs)',quick:'Hızlı karaoke (mid-side) açık',
+    instrumental:'Karaoke: enstrümantal (htdemucs) açık',vocals:'Akapella: sadece vokal (htdemucs) açık'})[mode]||'Karaoke';
+}
+function updateSepPill(pct,status){
+  let p=$('#sepPill');
+  if(pct>=100||!status){if(p)p.remove();return;}
+  if(!p){p=el('div','dl-pill');p.id='sepPill';
+    p.innerHTML='<span class="dl-txt"></span><div class="dl-bar"><div class="dl-fill"></div></div>';
+    document.body.appendChild(p);}
+  p.querySelector('.dl-txt').textContent='🎤 '+status+'  %'+Math.round(pct);
+  p.querySelector('.dl-fill').style.width=pct+'%';
+}
+function toggleKaraoke(){openKaraokeMenu();}   // geriye uyum (komut paleti vb.)
 function toggleCompact(){document.body.classList.toggle('compact');}
 
 /* ================= KLİP MODU =================

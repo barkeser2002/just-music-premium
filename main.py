@@ -71,7 +71,7 @@ def main() -> int:
             super().__init__()
             self.setWindowTitle(config.APP_NAME)
             self.resize(1460, 920)
-            self.setMinimumSize(1120, 700)
+            self.setMinimumSize(900, 600)  # küçük ekran: responsive CSS devreye girsin
             self._bridge = None
 
         def closeEvent(self, event):  # noqa: N802

@@ -67,6 +67,15 @@ jobs:
       - name: Derle (PyInstaller)
         run: python build.py
 
+      - name: Disk alanı aç (torch/dist büyük — WiX cab'i için yer gerek)
+        shell: pwsh
+        run: |
+          pip cache purge 2>$null
+          Remove-Item -Recurse -Force build, ffmpeg_tmp, deno_tmp, ffmpeg.zip, deno.zip -ErrorAction SilentlyContinue
+          $d = Get-PSDrive C
+          "dist: {0} MB" -f [math]::Round(((Get-ChildItem dist -Recurse -File | Measure-Object Length -Sum).Sum/1MB),0)
+          "C: boş {0} GB" -f [math]::Round($d.Free/1GB,1)
+
       - name: .msi paketle (WiX 3.14)
         shell: pwsh
         run: |

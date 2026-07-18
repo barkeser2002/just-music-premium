@@ -48,8 +48,16 @@ Windows için profesyonel müzik çalar. **Spotify tarzı web arayüzü (QtWebEn
   **10 bant özel EQ** + **🤖 Oto EQ** + efekt paneli (Preamp, Bass Boost, Echo,
   Reverb, **8D Spatial**) — çalarken anında. **Gerçek FFT görselleştirici**.
 - **yt-dlp Python kütüphanesi** + gömülü `ffmpeg.exe`/`deno.exe`: kurulum
-  gerekmez. **Ara → 20 sonucu
-  kapaklarıyla gör → seç → toplu indir**; ya da bağlantı yapıştır → direkt mp3.
+  gerekmez. **Ara → 20 sonucu kapaklarıyla gör → satıra tıkla, anında insin**
+  (tek tık = tek indirme); dilersen **checkbox ile seçip toplu indir**; ya da
+  bağlantı yapıştır → direkt mp3.
+- **🎤 Stüdyo karaoke (htdemucs / Demucs, YALNIZCA CPU):** şarkıyı gerçekten
+  vokal + enstrüman olarak ayırır. Player'daki mikrofon düğmesi bir menü açar:
+  **Enstrümantal** (karaoke), **Akapella** (sadece vokal), **⚡ Hızlı karaoke**
+  (anında mid-side, motor gerektirmez) ve **Kapat**. Ayrılan stem'ler
+  `~/Music/JustMusic/stems/` altında **önbelleğe** alınır → aynı şarkı bir daha
+  ayrılmaz (anında geçiş). CPU'da ilk ayırma şarkı başına **~4-5 dk** sürer,
+  ilerleme gösterilir; geçiş **çaldığın saniyeyi koruyarak** yapılır.
 - **Akıllı isim & kapak:** dağınık MP3 adları temizlenip "Sanatçı - Başlık"a
   ayrıştırılır, bu temiz adla YouTube kapağı çekilir. "🖼 İsim & Kapak" ile toplu
   senkron.
