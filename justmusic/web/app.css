@@ -40,6 +40,7 @@ img{display:block}
 .topbar-left{display:flex;gap:8px}
 .round-btn{width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.6);color:#e8e8e8;font-size:20px;display:flex;align-items:center;justify-content:center;transition:.15s}
 .round-btn:hover{background:#1f1f1f;transform:scale(1.05)}
+.round-btn.nav-off{opacity:.3;pointer-events:none}   /* geçmiş yoksa geri/ileri pasif */
 .search-wrap{display:flex;align-items:center;gap:10px;flex:1;max-width:560px}
 .home-btn{width:44px;height:44px;border-radius:50%;background:var(--panel2);font-size:18px;display:flex;align-items:center;justify-content:center;transition:.15s}
 .home-btn:hover{background:var(--card-h);transform:scale(1.04)}
@@ -390,9 +391,11 @@ body,input,select,textarea,button{font-family:'Manrope','Segoe UI',system-ui,san
 .sc-row kbd{background:#2a2a2a;border:1px solid #444;border-bottom-width:2px;border-radius:6px;padding:4px 10px;font-family:var(--font-display);font-size:12px;min-width:58px;text-align:center;color:#fff}
 .sc-row span{color:#ccc;font-size:14px}
 
-/* indirme pill */
-.dl-pill{position:fixed;right:20px;bottom:calc(var(--player-h) + 18px);background:#1c1c20;border:1px solid #333;border-radius:14px;padding:12px 16px;min-width:250px;box-shadow:var(--shadow);opacity:0;transform:translateY(14px);transition:.25s;z-index:9995;pointer-events:none}
+/* indirme / ayırma pill'leri — SOL-alt (mini-klip sağ-altta, çakışmasın).
+   İki pill aynı anda çıkabilir: #sepPill, #dlPill'in üstüne yığılır. */
+.dl-pill{position:fixed;left:20px;right:auto;bottom:calc(var(--player-h) + 18px);background:#1c1c20;border:1px solid #333;border-radius:14px;padding:12px 16px;min-width:250px;box-shadow:var(--shadow);opacity:0;transform:translateY(14px);transition:.25s;z-index:9995;pointer-events:none}
 .dl-pill.show{opacity:1;transform:translateY(0)}
+#sepPill{bottom:calc(var(--player-h) + 78px)}   /* indirme pill'inin üstünde */
 .dl-txt{font-size:12px;font-weight:700;display:block;margin-bottom:8px}
 .dl-bar{height:5px;background:#333;border-radius:3px;overflow:hidden}
 .dl-fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width .2s}

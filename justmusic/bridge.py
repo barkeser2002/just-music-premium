@@ -29,10 +29,12 @@ class SearchThread(QThread):
     results = pyqtSignal(list)
     failed = pyqtSignal(str)
 
-    def __init__(self, query: str, limit: int = 20, parent=None) -> None:
+    def __init__(self, query: str, limit: int = 20, parent=None,
+                 playlist_url: str = "") -> None:
         super().__init__(parent)
         self.query = query
         self.limit = limit
+        self.playlist_url = playlist_url   # dolu ise: playlist'i aç (arama değil)
         self._stopped = False
 
     def stop(self) -> None:
@@ -44,11 +46,18 @@ class SearchThread(QThread):
         except ImportError:
             self.failed.emit("yt-dlp kütüphanesi bulunamadı.")
             return
-        opts = {"quiet": True, "no_warnings": True, "skip_download": True,
-                "extract_flat": True, "noplaylist": True}
+        if self.playlist_url:
+            # PLAYLIST modu: URL'yi aynen aç, noplaylist=False ile tüm parçaları listele
+            opts = {"quiet": True, "no_warnings": True, "skip_download": True,
+                    "extract_flat": True, "noplaylist": False, "playlistend": 200}
+            target = self.playlist_url
+        else:
+            opts = {"quiet": True, "no_warnings": True, "skip_download": True,
+                    "extract_flat": True, "noplaylist": True}
+            target = f"ytsearch{self.limit}:{self.query}"
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(f"ytsearch{self.limit}:{self.query}", download=False)
+                info = ydl.extract_info(target, download=False)
         except Exception as exc:
             self.failed.emit(str(exc))
             return
@@ -291,6 +300,7 @@ class Bridge(QObject):
         self.normalize = bool(self.library.settings.get("normalize", False))
         self.download_queue: list[str] = []
         self.active_download = None
+        self.download_total = 0        # "X/Y" pill sayacı (toplu indirmede)
         self.scan_thread = None
         self._search = None
         self.user_queue: list[dict] = []      # {"playlist","id"}
@@ -355,7 +365,8 @@ class Bridge(QObject):
             return json.dumps({"none": True})
         v = self._song_view(song)
         v.update({"playlist": self.play_list_name, "lyrics": song.get("lyrics", ""),
-                  "shuffle": self.shuffle, "repeat": self.repeat_one})
+                  "shuffle": self.shuffle, "repeat": self.repeat_one,
+                  "repeat_mode": self.repeat_mode})
         return json.dumps(v)
 
     def _apply_audio_settings(self) -> None:
@@ -1266,6 +1277,32 @@ class Bridge(QObject):
         self._search.start()
 
     @pyqtSlot(str)
+    def importPlaylist(self, url: str) -> None:
+        """YouTube playlist URL'sini aç: tüm parçaları arama sonucu satırları gibi
+        listeler → renderSearchRows checkbox'larıyla önizle-ve-seç, toplu indir."""
+        url = url.strip()
+        if not url:
+            return
+        self.toastSignal.emit("📃 Playlist yükleniyor…")
+        self._search = SearchThread("", 20, self, playlist_url=url)
+        self._search.results.connect(self._on_playlist_rows)
+        self._search.failed.connect(lambda m: self.searchResultsSignal.emit(json.dumps({"error": m})))
+        self._search.start()
+
+    def _on_playlist_rows(self, rows: list) -> None:
+        self.searchResultsSignal.emit(json.dumps(rows))
+        if rows:
+            self.toastSignal.emit(f"📃 Playlist: {len(rows)} parça — seç ve indir.")
+        else:
+            self.toastSignal.emit("Playlist boş veya çözülemedi.")
+
+    def _dl_counter(self) -> str:
+        if self.download_total > 1:
+            done = self.download_total - len(self.download_queue)
+            return f"{done}/{self.download_total}"
+        return ""
+
+    @pyqtSlot(str)
     def downloadUrls(self, urls_json: str) -> None:
         try:
             urls = json.loads(urls_json)
@@ -1273,19 +1310,25 @@ class Bridge(QObject):
             return
         if isinstance(urls, str):
             urls = [urls]
+        if not urls:
+            return
         self.download_queue.extend(urls)
+        self.download_total += len(urls)      # toplu sayaç birikir
         self._maybe_start_download()
 
     def _maybe_start_download(self) -> None:
         if self._closing or (self.active_download and self.active_download.isRunning()):
             return
         if not self.download_queue:
+            self.download_total = 0            # kuyruk bitti: sayacı sıfırla
             self.downloadProgressSignal.emit(0, "", 0)
             return
         url = self.download_queue.pop(0)
-        self.downloadProgressSignal.emit(0, "İndiriliyor…", len(self.download_queue))
+        c = self._dl_counter()
+        self.downloadProgressSignal.emit(0, f"İndiriliyor… {c}".strip(), len(self.download_queue))
         t = DownloadThread(url, self)
-        t.progress.connect(lambda pct, s: self.downloadProgressSignal.emit(pct, s, len(self.download_queue)))
+        t.progress.connect(lambda pct, s: self.downloadProgressSignal.emit(
+            pct, f"{s} {self._dl_counter()}".strip(), len(self.download_queue)))
         t.finished_ok.connect(self._on_download_done)
         t.failed.connect(lambda m: self.toastSignal.emit(m))
         t.finished.connect(self._download_finished)

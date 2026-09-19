@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Python bağımlılıkları (requirements.txt) — yt-dlp gibi hızlı eskiyenleri güncel tut
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      python-deps:
+        patterns: ["*"]
+    commit-message:
+      prefix: "deps"
+
+  # GitHub Actions (workflow'lardaki action sürümleri — Node20 deprecation vb.)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"

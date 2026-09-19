@@ -1,9 +1,23 @@
-# 🎵 Just Music Premium
+<p align="center">
+  <img src="site/img/banner.png" alt="Just Music Premium" width="860">
+</p>
 
-Windows için profesyonel müzik çalar. **Spotify tarzı web arayüzü (QtWebEngine)**
-+ **yerli DSP ses motoru** (gerçek zamanlı EQ & efektler) + **gömülü yt-dlp/ffmpeg**.
+<h1 align="center">🎵 Just Music Premium</h1>
 
-<img src="justmusic/assets/logo.png" alt="Just Music logo" width="120">
+<p align="center">
+  Windows için profesyonel müzik çalar — <b>Spotify tarzı QtWebEngine arayüzü</b> +
+  <b>yerli DSP ses motoru</b> (gerçek zamanlı EQ & efektler) + <b>gömülü yt-dlp/ffmpeg</b> +
+  <b>htdemucs stüdyo karaoke</b>.
+</p>
+
+<p align="center">
+  <a href="https://github.com/barkeser2002/just-music-premium/releases/latest"><img alt="sürüm" src="https://img.shields.io/github/v/release/barkeser2002/just-music-premium?color=1db954&label=s%C3%BCr%C3%BCm&style=for-the-badge"></a>
+  <a href="https://github.com/barkeser2002/just-music-premium/releases/latest/download/JustMusic-Setup.msi"><img alt="indir" src="https://img.shields.io/badge/%E2%AC%87%20.msi-indir-1db954?style=for-the-badge"></a>
+  <img alt="indirme" src="https://img.shields.io/github/downloads/barkeser2002/just-music-premium/total?color=1ed760&label=indirme&style=for-the-badge">
+  <img alt="platform" src="https://img.shields.io/badge/Windows-10%2F11-2a2a2a?style=for-the-badge&logo=windows">
+  <img alt="python" src="https://img.shields.io/badge/Python-3.12-3776ab?style=for-the-badge&logo=python&logoColor=white">
+  <a href="https://barkeser2002.github.io/just-music-premium/"><img alt="tanıtım" src="https://img.shields.io/badge/%F0%9F%8C%90-tan%C4%B1t%C4%B1m-1ed760?style=for-the-badge"></a>
+</p>
 
 ## 📸 Ekran Görüntüleri
 
@@ -28,6 +42,21 @@ Windows için profesyonel müzik çalar. **Spotify tarzı web arayüzü (QtWebEn
   push edilince ffmpeg/yt-dlp/deno indirilir, PyInstaller derler, **WiX** ile `.msi` paketlenir ve
   Release'e yüklenir.
 
+## 🆕 v1.0.4
+
+- **📃 Playlist toplu indirme** — YouTube playlist URL'si → önizle, seç, X/Y sayaçlı toplu indir.
+- **⬅➡ Geri / İleri gezinme** — üst bardaki oklar artık görünüm geçmişinde dolaşıyor.
+- Düzeltmeler: komut paletinden karaoke menüsü artık kapanmıyor; arama/akıllı-liste görünümünde
+  yanlışlıkla sürükle-sırala kaldırıldı; indirme/ayırma bildirimleri üst üste binmiyor.
+- Bakım: **yt-dlp** güncellendi (YouTube tarafı değişince indirmedeki HTTP 403 düzeldi).
+
+## 📚 Geliştirici Belgeleri
+
+`docs/` altında — projeyi hızlı kavramak için:
+[Mimari](docs/ARCHITECTURE.md) · [Köprü Sinyalleri](docs/BRIDGE-SIGNALS.md) ·
+[Bilinen Sorunlar](docs/KNOWN-ISSUES.md) · [Geliştirici Rehberi + TR→EN sözlük](docs/DEV.md).
+Kod grafiği: `graphify-out/` (`graphify query "..."`).
+
 ## 🏗 Mimari
 
 - **Arayüz:** HTML/CSS/JS (`justmusic/web/`), `QWebEngineView` içinde render edilir →
@@ -51,6 +80,9 @@ Windows için profesyonel müzik çalar. **Spotify tarzı web arayüzü (QtWebEn
   gerekmez. **Ara → 20 sonucu kapaklarıyla gör → satıra tıkla, anında insin**
   (tek tık = tek indirme); dilersen **checkbox ile seçip toplu indir**; ya da
   bağlantı yapıştır → direkt mp3.
+- **📃 Playlist toplu indirme:** YouTube **playlist URL'si** yapıştır → tüm
+  parçalar kapaklarıyla önizlenir, **seç ve indir**; ilerleme **X/Y** sayacıyla
+  gösterilir, hepsi "İndirilenler" listesine düşer. *(v1.0.4)*
 - **🎤 Stüdyo karaoke (htdemucs / Demucs, YALNIZCA CPU):** şarkıyı gerçekten
   vokal + enstrüman olarak ayırır. Player'daki mikrofon düğmesi bir menü açar:
   **Enstrümantal** (karaoke), **Akapella** (sadece vokal), **⚡ Hızlı karaoke**

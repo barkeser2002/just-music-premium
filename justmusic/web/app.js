@@ -216,10 +216,37 @@ function showView(v){
   else if(v==='playlist'&&viewPlaylist)renderPlaylist(viewPlaylist);  // klipten listeye dönüş
   else renderHome();
   if(v!=='clip'&&clip)goMiniClip();   // klipten ayrılınca AKIŞI KESME — köşeye küçült
+  recordHistory();
 }
-function pushHistory(){/* basit; ileri/geri opsiyonel */}
+/* ---- gezinme geçmişi (üst-sol geri/ileri okları) ---- */
+let navLock=false;
+function recordHistory(){
+  if(navLock||view==='clip')return;                 // klip modu geçmişe girmez
+  const loc={view:view,playlist:viewPlaylist};
+  const cur=history[histPos];
+  if(cur&&cur.view===loc.view&&cur.playlist===loc.playlist)return;
+  history=history.slice(0,histPos+1);history.push(loc);histPos=history.length-1;
+  updateNavButtons();
+}
+function goToLoc(loc){
+  navLock=true;
+  if(loc.view==='playlist'&&loc.playlist){
+    viewPlaylist=loc.playlist;view='playlist';setNav('playlist');
+    bridge.selectPlaylist(loc.playlist);renderPlaylist(loc.playlist);renderSidebar();
+    if(clip)goMiniClip();
+  }else showView(loc.view);
+  navLock=false;
+}
+function navBack(){if(histPos>0){histPos--;goToLoc(history[histPos]);updateNavButtons();}}
+function navFwd(){if(histPos<history.length-1){histPos++;goToLoc(history[histPos]);updateNavButtons();}}
+function updateNavButtons(){
+  const b=$('#navBack'),f=$('#navFwd');
+  if(b)b.classList.toggle('nav-off',histPos<=0);
+  if(f)f.classList.toggle('nav-off',histPos>=history.length-1);
+}
+function pushHistory(){recordHistory();}   // geriye uyum
 function openPlaylist(name){viewPlaylist=name;view='playlist';setNav('playlist');bridge.selectPlaylist(name);renderPlaylist(name);renderSidebar();
-  if(clip)goMiniClip();}   // klip yaşıyorsa küçült, öldürme
+  if(clip)goMiniClip();recordHistory();}   // klip yaşıyorsa küçült, öldürme
 
 /* ================= HOME ================= */
 function greeting(){const h=new Date().getHours();return h<6?'İyi geceler':h<12?'Günaydın':h<18?'İyi günler':'İyi akşamlar';}
@@ -306,11 +333,11 @@ function renderPlaylist(name){
   else if(playlistSort==='artist')disp.sort((a,b)=>(a.artist||'').localeCompare(b.artist||'','tr'));
   else if(playlistSort==='duration')disp.sort((a,b)=>(a.duration_ms||0)-(b.duration_ms||0));
   else if(playlistSort==='plays')disp.sort((a,b)=>(b.play_count||0)-(a.play_count||0));
-  disp.forEach((s,i)=>wrap.appendChild(trackRow(s,i,name)));
+  disp.forEach((s,i)=>wrap.appendChild(trackRow(s,i,name,true)));   // gerçek tam-liste: sürüklenebilir
   m.appendChild(wrap);
   highlightActive();
 }
-function trackRow(s,i,pl){
+function trackRow(s,i,pl,reorderable){
   const t=el('div','track');t.dataset.sid=s.id;
   const idx=el('div','t-index');idx.innerHTML='<span class="num">'+(i+1)+'</span><span class="ic">▶</span>';
   const main=el('div','t-main');
@@ -328,13 +355,17 @@ function trackRow(s,i,pl){
   t.append(idx,main,src,fav,dur);
   t.onclick=()=>bridge.play(s.id,pl);
   t.oncontextmenu=e=>{e.preventDefault();trackMenu(e,s,pl);};
-  t.draggable=true;
-  t.ondragstart=e=>{e.dataTransfer.setData('text/plain',JSON.stringify({id:s.id,playlist:pl,idx:i}));e.dataTransfer.effectAllowed='copyMove';};
-  t.ondragover=e=>{e.preventDefault();t.classList.add('drag-over');};
-  t.ondragleave=()=>t.classList.remove('drag-over');
-  t.ondrop=e=>{e.preventDefault();t.classList.remove('drag-over');
-    try{const d=JSON.parse(e.dataTransfer.getData('text/plain'));
-      if(d&&d.playlist===pl&&d.idx!=null&&playlistSort==='default')bridge.reorderSong(pl,d.idx,i);}catch(_){}};
+  // Sürükle-sırala YALNIZ gerçek tam-liste görünümünde (renderPlaylist). Arama/akıllı
+  // listede indeks filtrelenmiş listeye ait; gerçek diziye uygulanırsa yanlış şarkı taşınır.
+  if(reorderable){
+    t.draggable=true;
+    t.ondragstart=e=>{e.dataTransfer.setData('text/plain',JSON.stringify({id:s.id,playlist:pl,idx:i}));e.dataTransfer.effectAllowed='copyMove';};
+    t.ondragover=e=>{e.preventDefault();t.classList.add('drag-over');};
+    t.ondragleave=()=>t.classList.remove('drag-over');
+    t.ondrop=e=>{e.preventDefault();t.classList.remove('drag-over');
+      try{const d=JSON.parse(e.dataTransfer.getData('text/plain'));
+        if(d&&d.playlist===pl&&d.idx!=null&&playlistSort==='default')bridge.reorderSong(pl,d.idx,i);}catch(_){}};
+  }
   return t;
 }
 function trackMenu(e,s,pl){
@@ -388,11 +419,19 @@ function renderSearch(){
   m.appendChild(pad);
   if(searchRows.length)renderSearchRows();
 }
+function isPlaylistUrl(q){return /[?&]list=/.test(q)||/\/playlist\?/.test(q);}
 function doSearch(q){
-  if(!q.trim())return;
+  q=q.trim();if(!q)return;
   if(view!=='search'){showView('search');}
-  const info=$('#searchInfo');if(info)info.textContent='“'+q+'” aranıyor…';
-  bridge.searchYouTube(q);
+  const info=$('#searchInfo');if(info)info.style.display='';
+  searchRows=[];const res=$('#searchResults');if(res)res.innerHTML='';
+  if(isPlaylistUrl(q)){                     // playlist URL → tüm parçaları önizle-ve-seç
+    if(info)info.textContent='📃 Playlist çözülüyor…';
+    bridge.importPlaylist(q);
+  }else{
+    if(info)info.textContent='“'+q+'” aranıyor…';
+    bridge.searchYouTube(q);
+  }
 }
 function onSearchResults(json){
   let data;try{data=JSON.parse(json);}catch(e){return;}
@@ -601,7 +640,8 @@ function onTrackChanged(){
   }
   active.playlist=track&&!track.none?track.playlist:active.playlist;
   active.song_id=track&&!track.none?track.id:null;
-  if(track&&!track.none){active.shuffle=track.shuffle;active.repeat=track.repeat;}
+  if(track&&!track.none){active.shuffle=track.shuffle;active.repeat=track.repeat;
+    if(track.repeat_mode!=null)active.repeat_mode=track.repeat_mode;}
   waveData=[];moodData=null;loopAB=null;updateMoodChip();  // yeni parça: analiz bekleniyor
   updatePlayer();highlightActive();renderRightPanel();
   if(view==='lyrics')renderLyricsView();
@@ -669,7 +709,7 @@ function refreshState(){bridge.getState(json=>{S=JSON.parse(json);active=S.activ
 
 function wireSignals(){
   bridge.stateChanged.connect(refreshState);
-  bridge.trackChanged.connect(j=>{track=JSON.parse(j);onTrackChanged();});
+  bridge.trackChanged.connect(j=>{try{track=JSON.parse(j);}catch(e){return;}onTrackChanged();});
   bridge.playingChanged.connect(p=>{active.playing=p;updatePlayBtn();if(clip)clipMirrorPlay(p);});
   bridge.positionChanged.connect((pos,dur)=>{updateSeek(pos,dur);if(clip){syncClipVideo(pos);clipSyncLyrics(pos);}});  // motor = tek saat
   bridge.spectrumSignal.connect(j=>{try{spectrum=JSON.parse(j);}catch(e){}});
@@ -712,9 +752,10 @@ function onUpdateReady(version){
 /* ================= EVENTS ================= */
 function wireEvents(){
   document.querySelectorAll('.nav-link').forEach(b=>b.onclick=()=>showView(b.dataset.view));
+  $('#navBack').onclick=navBack;$('#navFwd').onclick=navFwd;updateNavButtons();
   $('#homeBtn').onclick=()=>showView('home');
   $('#topSearch').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch(e.target.value);});
-  $('#topSearch').addEventListener('input',e=>{localQuery=e.target.value.trim();if(localQuery){if(view!=='search')showView('search');else renderSearch();}});
+  $('#topSearch').addEventListener('input',e=>{localQuery=e.target.value.trim();searchRows=[];/* sorgu değişti: eski YouTube sonuçları bayat */if(localQuery){if(view!=='search')showView('search');else renderSearch();}else if(view==='search')renderSearch();});
   $('#libSearch').addEventListener('input',renderSidebar);
   $('#importBtn').onclick=()=>bridge.importFiles();
   $('#createPlaylist').onclick=()=>modalPrompt('Yeni çalma listesi',[{ph:'Liste adı'}],v=>{if(v[0].trim())bridge.addPlaylist(v[0].trim());});
@@ -887,7 +928,7 @@ function showShortcuts(){
 function ensureDlPill(){let p=$('#dlPill');if(!p){p=el('div','dl-pill');p.id='dlPill';p.innerHTML='<span class="dl-txt"></span><div class="dl-bar"><div class="dl-fill"></div></div>';document.body.appendChild(p);}return p;}
 function updateDlPill(pct,status,q){const p=ensureDlPill();
   if(!status){p.classList.remove('show');return;}
-  p.classList.add('show');p.querySelector('.dl-txt').textContent='⬇ '+status+(q?' ('+q+' sırada)':'');
+  p.classList.add('show');p.querySelector('.dl-txt').textContent='⬇ '+status;  // status "X/Y" içerir
   p.querySelector('.dl-fill').style.width=(pct>0?pct:0)+'%';
   if(pct>=100&&status.indexOf('Dönüş')<0){/* keep */}
 }
@@ -1014,6 +1055,7 @@ function updateSepPill(pct,status){
   if(!p){p=el('div','dl-pill');p.id='sepPill';
     p.innerHTML='<span class="dl-txt"></span><div class="dl-bar"><div class="dl-fill"></div></div>';
     document.body.appendChild(p);}
+  p.classList.add('show');
   p.querySelector('.dl-txt').textContent='🎤 '+status+'  %'+Math.round(pct);
   p.querySelector('.dl-fill').style.width=pct+'%';
 }
@@ -1195,7 +1237,7 @@ function openPalette(){
   ];
   function render(q){
     q=(q||'').toLowerCase();list.innerHTML='';
-    commands.filter(c=>c[0].toLowerCase().includes(q)).slice(0,8).forEach(c=>{const it=el('div','palette-item',c[0]);it.onclick=()=>{back.remove();c[1]();};list.appendChild(it);});
+    commands.filter(c=>c[0].toLowerCase().includes(q)).slice(0,8).forEach(c=>{const it=el('div','palette-item',c[0]);it.onclick=e=>{e.stopPropagation();back.remove();c[1]();};list.appendChild(it);});  // stopPropagation: komut bir menü açarsa global tıkla-kapat onu silmesin
     if(q){allSongsWithPl().filter(([s])=>s.title.toLowerCase().includes(q)||(s.artist||'').toLowerCase().includes(q)).slice(0,8).forEach(([s,pl])=>{
       const it=el('div','palette-item','🎵 '+s.title+(s.artist?' — '+s.artist:''));it.onclick=()=>{back.remove();bridge.play(s.id,pl);};list.appendChild(it);});
       Object.keys(S.playlists).filter(n=>n.toLowerCase().includes(q)).slice(0,5).forEach(n=>{const it=el('div','palette-item','📂 '+n);it.onclick=()=>{back.remove();openPlaylist(n);};list.appendChild(it);});}
