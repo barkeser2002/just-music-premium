@@ -4,7 +4,8 @@ PyQt6-WebEngine>=6.6
 numpy>=1.26
 scipy>=1.11
 sounddevice>=0.4.6
-yt-dlp>=2026.7.4
+yt-dlp>=2026.8.19   # YouTube imza/player'ı sık değişir; taban güncel tutulur, CI en yenisini çeker
+                    # (2026.07.04 → indirmede HTTP 403; yükseltme düzeltti)
 
 # Stüdyo karaoke: htdemucs ile vokal/enstrüman ayırma (YALNIZCA CPU).
 # torch'un CPU tekerleği yeterli (~490 MB); CUDA sürümü gerekmez.
