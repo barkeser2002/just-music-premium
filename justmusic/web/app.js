@@ -843,13 +843,14 @@ function wireEvents(){
     else if(e.code==='KeyS')toggleShuffle();else if(e.code==='KeyL')cycleRepeat();
     else if(e.code==='KeyN')bridge.next();else if(e.code==='KeyP')bridge.prev();
     else if(e.code==='KeyF')openFullscreen();
+    else if(e.code==='KeyI')toggleLyricsIsland();   // söz adası
     else if(e.key==='/'){e.preventDefault();$('#topSearch').focus();}
     else if(e.key==='?')showShortcuts();
   });
 }
 let lastPos=0,lastDur=0;
 const _origUpdateSeek=updateSeek;
-updateSeek=function(pos,dur){lastPos=pos;lastDur=dur;_origUpdateSeek(pos,dur);syncLyrics(pos);};
+updateSeek=function(pos,dur){lastPos=pos;lastDur=dur;_origUpdateSeek(pos,dur);syncLyrics(pos);islandSync(pos);};
 
 /* ================= YENİ ÖZELLİKLER ================= */
 // -- özel vurgu rengi --
@@ -1024,10 +1025,18 @@ function drawSpectrogram(){
 }
 // -- LRC zaman kodlu şarkı sözleri --
 function parseLRC(text){
-  const lines=[];let plain=false;
+  const lines=[];let has=false;
   (text||'').split('\n').forEach(l=>{const m=l.match(/^\[(\d{1,2}):(\d{2})(?:[.:](\d{1,2}))?\]\s*(.*)$/);
-    if(m){lines.push({t:(+m[1])*60+(+m[2])+(m[3]?(+m[3])/100:0),txt:m[4]});}else if(l.trim()){plain=true;}});
-  return lines.length?lines.sort((a,b)=>a.t-b.t):null;
+    if(!m)return;
+    const t=(+m[1])*60+(+m[2])+(m[3]?(+m[3])/100:0);
+    const rest=m[4];
+    // Enhanced LRC (A2) kelime zamanları: <mm:ss.xx>kelime — varsa word-by-word
+    const words=[];const wre=/<(\d{1,2}):(\d{2})(?:[.:](\d{1,2}))?>([^<]*)/g;let wm,any=false;
+    while((wm=wre.exec(rest))){any=true;const wt=(+wm[1])*60+(+wm[2])+(wm[3]?(+wm[3])/100:0);
+      if(wm[4]!=='')words.push({t:wt,txt:wm[4]});}
+    const plain=rest.replace(/<\d{1,2}:\d{2}(?:[.:]\d{1,2})?>/g,'').trim();
+    lines.push({t:t,txt:plain,words:any?words:null});has=true;});
+  return has?lines.sort((a,b)=>a.t-b.t):null;
 }
 function syncLyrics(pos){
   const box=document.querySelector('.lrc-lines');if(!box)return;
@@ -1035,6 +1044,41 @@ function syncLyrics(pos){
   let cur=-1;for(let i=0;i<lines.length;i++){if(pos>=lines[i].t)cur=i;else break;}
   [...box.children].forEach((el2,i)=>el2.classList.toggle('active',i===cur));
   if(cur>=0&&box.children[cur]){box.children[cur].scrollIntoView({block:'center',behavior:'smooth'});}
+}
+/* ---- Dinamik söz adası (word-by-word, yüzen cam) ---- */
+let lyricsIsland=null;
+function makeDraggable(elm){
+  let sx,sy,ox,oy,drag=false;
+  elm.addEventListener('mousedown',e=>{if(e.target.closest('button'))return;drag=true;sx=e.clientX;sy=e.clientY;
+    const r=elm.getBoundingClientRect();ox=r.left;oy=r.top;elm.style.transition='none';e.preventDefault();});
+  window.addEventListener('mousemove',e=>{if(!drag)return;
+    elm.style.left=Math.max(6,Math.min(window.innerWidth-elm.offsetWidth-6,ox+e.clientX-sx))+'px';
+    elm.style.top=Math.max(6,Math.min(window.innerHeight-elm.offsetHeight-6,oy+e.clientY-sy))+'px';
+    elm.style.bottom='auto';elm.style.transform='none';});
+  window.addEventListener('mouseup',()=>{drag=false;elm.style.transition='';});
+}
+function toggleLyricsIsland(){
+  if(lyricsIsland){lyricsIsland.remove();lyricsIsland=null;showToast(T('🎤 Söz adası kapalı'));return;}
+  const isl=el('div','lyric-island');isl.id='lyricIsland';
+  isl.innerHTML='<div class="li-cur"></div><div class="li-next"></div>';
+  makeDraggable(isl);document.body.appendChild(isl);lyricsIsland=isl;lyricsIsland._idx=-2;
+  islandSync(lastPos||0);showToast(T('🎤 Söz adası açık'));
+}
+function islandSync(pos){
+  if(!lyricsIsland)return;
+  const cd=lyricsIsland.querySelector('.li-cur'),nd=lyricsIsland.querySelector('.li-next');
+  const lrc=parseLRC(track&&track.lyrics);
+  if(!lrc){cd.textContent=T('Zaman kodlu söz yok');nd.textContent='';lyricsIsland._idx=-2;return;}
+  let cur=-1;for(let i=0;i<lrc.length;i++){if(pos>=lrc[i].t)cur=i;else break;}
+  if(cur!==lyricsIsland._idx){
+    lyricsIsland._idx=cur;
+    if(cur<0){cd.textContent=lrc[0]?lrc[0].txt:'';nd.textContent='';return;}
+    const line=lrc[cur];
+    if(line.words&&line.words.length){cd.innerHTML='';line.words.forEach(w=>{const s=el('span','kw',w.txt);s._t=w.t;cd.appendChild(s);});}
+    else cd.textContent=line.txt;
+    nd.textContent=lrc[cur+1]?lrc[cur+1].txt:'';
+  }
+  if(cur>=0&&lrc[cur].words){cd.querySelectorAll('.kw').forEach(s=>s.classList.toggle('done',pos>=s._t));}
 }
 function onLoop(a,b){loopAB=(a<0)?null:{a:a,b:(b<0?null:b)};
   document.querySelectorAll('.abloop-status').forEach(e=>e.textContent=loopStatusText());drawWaveforms();}
@@ -1288,7 +1332,7 @@ function openPalette(){
     ['📋 Kuyruk',()=>showView('queue')],['🔄 Müzik Tara',()=>bridge.scanMusic()],
     ['➕ MP3 Ekle',()=>bridge.importFiles()],['💾 Yedek Al',()=>bridge.backup()],
     ['⛶ Tam Ekran',()=>openFullscreen()],['💡 Ambiyans Işığı',()=>toggleAmbient()],
-    ['🎙 Karaoke',()=>toggleKaraoke()],['⌨ Kısayollar',()=>showShortcuts()],
+    ['🎙 Karaoke',()=>toggleKaraoke()],['🎤 Söz Adası',()=>toggleLyricsIsland()],['⌨ Kısayollar',()=>showShortcuts()],
     ['⏭ Sonraki',()=>bridge.next()],['⏮ Önceki',()=>bridge.prev()],['⏯ Oynat/Duraklat',()=>bridge.toggle()],
   ];
   function render(q){

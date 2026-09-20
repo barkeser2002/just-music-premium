@@ -565,3 +565,16 @@ body.compact .sidebar,body.compact .right-panel{display:none}
 .right-panel .np-pad{ position:relative; z-index:1; }
 /* tam ekran arka plan: kapak blur */
 .fs-bg{ background-size:cover; background-position:center; filter:blur(66px) saturate(1.7) brightness(.6); transform:scale(1.2); }
+
+/* Dinamik söz adası (word-by-word, yüzen cam) */
+.lyric-island{ position:fixed; left:50%; bottom:calc(var(--player-h) + 20px); transform:translateX(-50%);
+  min-width:320px; max-width:62vw; padding:16px 24px; border-radius:20px; z-index:9990; cursor:grab; user-select:none;
+  background:color-mix(in srgb, rgba(var(--accent-rgb),.15), rgba(18,18,22,.72));
+  -webkit-backdrop-filter:blur(26px) saturate(160%); backdrop-filter:blur(26px) saturate(160%);
+  border:1px solid rgba(255,255,255,.12); box-shadow:0 18px 54px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.12);
+  text-align:center; animation:viewIn .25s ease; }
+.lyric-island:active{ cursor:grabbing; }
+.li-cur{ font-family:var(--font-display); font-weight:800; font-size:22px; line-height:1.3; color:#fff; }
+.li-next{ margin-top:6px; font-size:14px; color:rgba(255,255,255,.42); }
+.li-cur .kw{ color:rgba(255,255,255,.4); transition:color .18s ease, text-shadow .18s ease; }
+.li-cur .kw.done{ color:#fff; text-shadow:0 0 14px rgba(var(--accent-rgb),.6); }

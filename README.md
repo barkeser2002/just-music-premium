@@ -42,6 +42,17 @@
   push edilince ffmpeg/yt-dlp/deno indirilir, PyInstaller derler, **WiX** ile `.msi` paketlenir ve
   Release'e yüklenir.
 
+## 🆕 v1.2.0 — modern görünüm
+
+- **🫧 Cam arayüz (glassmorphism):** menüler, komut paleti, bildirimler, mini-oynatıcı ve alt player bar
+  buzlu cam; arkasındaki içerik yumuşak blur'lü görünür.
+- **🎨 Kapak-renginden adaptif tema:** çalan parçanın kapak rengi tüm arayüze (accent, görselleştirici,
+  butonlar) yansır — okunabilir aralığa clamp'lenir; özel renk seçilince kapanır.
+- **🖼 "Şimdi Çalıyor" hero:** sağ panel ve tam ekranda blurlu kapak arka planı (Apple Music tarzı immersive).
+- **🎤 Dinamik söz adası:** yüzen cam söz penceresi — Enhanced-LRC ile **kelime kelime (karaoke)** vurgulanır,
+  sürüklenebilir. `I` tuşu veya komut paletinden aç.
+- **✨ Hareket:** kart/parça giriş animasyonu (kademeli), buton "spring" tepkileri.
+
 ## 🆕 v1.1.0
 
 - **🌍 Dil desteği (TR + EN)** — üst bardaki dil seçicisinden anında geçiş; seçim kaydedilir.
