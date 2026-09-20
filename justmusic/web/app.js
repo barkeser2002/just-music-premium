@@ -190,6 +190,7 @@ function renderSidebar(){
     if(q && !name.toLowerCase().includes(q))return;
     const songs=songsOf(name);
     const row=el('div','pl-row'+(name===viewPlaylist?' active':''));
+    row.title=T(name);   // ikon rayı daralınca kapağın üstünde isim görünsün
     const info=el('div','pl-info');
     info.appendChild(el('div','pl-name',T(name)));
     info.appendChild(el('div','pl-sub',T('Çalma listesi • '+songs.length+' şarkı')));
@@ -205,7 +206,7 @@ function renderSidebar(){
   const sps=smartPlaylists().filter(sp=>sp.items.length);
   if(sps.length){
     box.appendChild(el('div','pl-section-label',T('⚙ Akıllı Listeler')));
-    sps.forEach(sp=>{const row=el('div','pl-row');
+    sps.forEach(sp=>{const row=el('div','pl-row');row.title=T(sp.name);
       const cv=el('div','pl-cover smart-cover');cv.textContent=sp.name.split(' ')[0];
       const info=el('div','pl-info');info.appendChild(el('div','pl-name',T(sp.name).replace(/^\S+\s/,'')));info.appendChild(el('div','pl-sub',T(sp.items.length+' şarkı')));
       row.append(cv,info);row.onclick=()=>openSmart(sp);box.appendChild(row);});
@@ -272,6 +273,8 @@ function updateNavButtons(){
 function pushHistory(){recordHistory();}   // geriye uyum
 function setSidebarRail(on){
   document.getElementById('app').classList.toggle('sidebar-rail',on);
+  // daralınca ikonların üstünde etiket görünsün: nav başlığını span metninden al (çeviri-uyumlu)
+  document.querySelectorAll('.nav-link').forEach(b=>{const s=b.querySelector('span');if(s)b.title=s.textContent.trim();});
   try{localStorage.setItem('jm_sidebar_rail',on?'1':'0');}catch(e){}
 }
 function openPlaylist(name){viewPlaylist=name;view='playlist';setNav('playlist');bridge.selectPlaylist(name);renderPlaylist(name);renderSidebar();
@@ -875,6 +878,7 @@ function wireEvents(){
     else if(e.code==='KeyN')bridge.next();else if(e.code==='KeyP')bridge.prev();
     else if(e.code==='KeyF')openFullscreen();
     else if(e.code==='KeyI')toggleLyricsIsland();   // söz adası
+    else if(e.code==='KeyB')setSidebarRail(!document.getElementById('app').classList.contains('sidebar-rail'));   // kenar çubuğu rayı
     else if(e.key==='/'){e.preventDefault();$('#topSearch').focus();}
     else if(e.key==='?')showShortcuts();
   });
@@ -1010,7 +1014,7 @@ function closeFullscreen(){const o=$('#fsNow');if(o)o.remove();document.removeEv
 
 // -- klavye kısayolları --
 function showShortcuts(){
-  const rows=[['Boşluk','Oynat / Duraklat'],['← / →','10 sn geri / ileri'],['↑ / ↓','Ses',],['S','Karıştır'],['L','Tekrar'],['N / P','Sonraki / Önceki'],['F','Tam ekran'],['/','Arama'],['?','Bu pencere']];
+  const rows=[['Boşluk','Oynat / Duraklat'],['← / →','10 sn geri / ileri'],['↑ / ↓','Ses',],['S','Karıştır'],['L','Tekrar'],['N / P','Sonraki / Önceki'],['F','Tam ekran'],['I','Söz adası'],['B','Kenar çubuğu (daralt/genişlet)'],['/','Arama'],['?','Bu pencere']];
   const back=el('div','modal-back');const mo=el('div','modal');mo.style.width='440px';
   mo.appendChild(el('h3',null,T('⌨ Klavye Kısayolları')));
   const list=el('div','sc-list');
@@ -1374,6 +1378,7 @@ function openPalette(){
     ['➕ MP3 Ekle',()=>bridge.importFiles()],['💾 Yedek Al',()=>bridge.backup()],
     ['⛶ Tam Ekran',()=>openFullscreen()],['💡 Ambiyans Işığı',()=>toggleAmbient()],
     ['🎙 Karaoke',()=>toggleKaraoke()],['🎤 Söz Adası',()=>toggleLyricsIsland()],['⌨ Kısayollar',()=>showShortcuts()],
+    ['📐 Kenar Çubuğu (daralt/genişlet)',()=>setSidebarRail(!document.getElementById('app').classList.contains('sidebar-rail'))],
     ['⏭ Sonraki',()=>bridge.next()],['⏮ Önceki',()=>bridge.prev()],['⏯ Oynat/Duraklat',()=>bridge.toggle()],
   ];
   function render(q){
