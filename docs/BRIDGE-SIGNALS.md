@@ -77,9 +77,10 @@ Reference for the QWebChannel contract between the Python `Bridge`
   "protected": ["<protected playlist names>"],
   "version": "<APP_VERSION>",
   "current": "<current playlist>",
-  "settings": { /* library.settings: theme, accent, volume, speed,
+  "settings": { /* library.settings: theme, accent, lang, volume, speed,
                    eq_gains, eq_enabled, eq_preset, effects, normalize,
-                   soundscape, recent, playlist_covers, playlist_desc, ... */ },
+                   soundscape, crossfade, gapless, discord_rpc, discord_client_id,
+                   recent, playlist_covers, playlist_desc, ... */ },
   "presets": { "<preset name>": [10 EQ gains] },
   "presetNames": ["<ordered preset names>"],
   "bandLabels": ["<10 EQ band labels>"],
@@ -91,7 +92,8 @@ Reference for the QWebChannel contract between the Python `Bridge`
   "recent": [ /* _song_view objects, each with an added "playlist" field */ ],
   "favoritesName": "<favorites playlist name>",
   "demucs": false,             // studio-karaoke (htdemucs) engine available?
-  "karaokeMode": "off"
+  "karaokeMode": "off",
+  "discordAvail": false        // pypresence importable? (Discord RPC available) — v1.3.0
 }
 ```
 
@@ -230,6 +232,16 @@ are invoked with a callback in JS: `bridge.getState(json => {...})`.
 |---|---|---|
 | `setKaraoke` | `(mode: str)` | `off` / `quick` (instant mid-side) / `instrumental` / `vocals` (htdemucs stems). Falls back to `quick` when demucs is unavailable; drives `karaokeModeSignal` + `separationProgressSignal`. |
 
+### Transitions & Discord (v1.3.0)
+| Slot | Args | Purpose |
+|---|---|---|
+| `setCrossfade` | `(sec: float)` | Crossfade length 0–12s (`0` = off). Engine pre-decodes the next sequential track and equal-power blends over the last `sec` seconds. Persists `settings.crossfade`. |
+| `setGapless` | `(on: bool)` | Seamless boundary join (no gap, no overlap) when a next track is preloaded. Persists `settings.gapless`. |
+| `setDiscordRpc` | `(on: bool)` | Enable/disable Discord Rich Presence. Needs a Client ID first (else a toast). Persists `settings.discord_rpc`. |
+| `setDiscordClientId` | `(cid: str)` | Store the Discord **Application ID** (`settings.discord_client_id`); reconnects if RPC is on. |
+
+> **Engine mechanics:** the transition only fires for **predictable sequential playback** — not when shuffle is on, `user_queue` is non-empty, or `repeat_mode == 2` (repeat-one). The poll (`_maybe_preload_next`) calls `engine.preload_next(path)` when `dur - pos ≤ crossfade + 8s`; the engine promotes next→current inside the audio callback (`_promote_next`) and flags it via `consume_advanced()`, which the poll turns into a **gapless UI update** (`_on_crossfade_advanced`) with no reload. Default off = byte-for-byte the old behavior. See `docs/ARCHITECTURE.md`.
+
 ### Clip (music-video) mode
 | Slot | Args | Purpose |
 |---|---|---|
@@ -262,10 +274,10 @@ are invoked with a callback in JS: `bridge.getState(json => {...})`.
 | `getState` | `() → str` | Full app state JSON (schema above). Callback. |
 | `setTheme` | `(name: str)` | Set the theme (clears custom accent). |
 | `setAccent` | `(hex_color: str)` | Set a custom accent color. |
+| `setLanguage` | `(code: str)` | Persist UI language (`tr`/`en`). Since **v1.1.0**; display-only translate-by-source via `web/i18n.js` `T()` — internal data stays Turkish. |
 | `backup` | `()` | Save a JSON library backup (native file dialog). |
 
-> **`setLanguage` is not implemented.** No such slot exists in `bridge.py`;
-> localization is baked into the UI strings.
+> **i18n note (v1.1.0+):** localization is **translate-by-source** — the UI calls `T(turkishString)` from `web/i18n.js`; only display text is translated, internal logic/data (mood labels, protected-playlist keys, status matching) stays Turkish. Add a language by extending `LANGS` in `i18n.js`, no Python change needed.
 
 ---
 

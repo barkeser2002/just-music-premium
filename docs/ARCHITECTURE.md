@@ -215,6 +215,39 @@ ignores it — audio is always the engine (`bridge.py:169-185`, and
 
 ---
 
+## 6b. Transitions: crossfade / gapless + Discord (v1.3.0)
+
+- **Pre-decode the next track.** `DspEngine.preload_next(path)` decodes the
+  upcoming track on a worker thread into `_next_audio` (gen-guarded like `_gen`).
+  `Bridge._maybe_preload_next` (in `_on_poll`) triggers this when
+  `dur - pos ≤ crossfade + 8s`, but **only for predictable sequential playback** —
+  it bails when `shuffle`, a non-empty `user_queue`, or `repeat_mode == 2`
+  (repeat-one) would make "next" unpredictable. `load()`/`swap_source()`/`clear()`
+  all call `clear_next()` so a manual skip drops a stale preload.
+- **The blend happens in the one audio callback.** In `_callback`, once the next
+  buffer exists and no A-B loop is active: with `crossfade_sec > 0` it equal-power
+  crossfades (`gout=cos(t·π/2)`, `gin=sin(t·π/2)`, `t` from per-sample seconds-left)
+  by mixing `_interp_block(current)` with `_interp_block(next)` **before** the shared
+  DSP chain, so EQ/effects apply once to the blended stream. With `gapless` (and
+  `crossfade_sec == 0`) it promotes at the boundary with no overlap.
+- **Promotion → gapless UI update.** `_promote_next()` swaps `audio`/`current_path`
+  ← next under the lock, carries `pos` from `_next_pos`, and sets `_advanced`.
+  The poll calls `engine.consume_advanced()`; a returned path routes to
+  `Bridge._on_crossfade_advanced`, which advances `play_index`/`active_song_id` and
+  emits `trackChanged` **without reloading the engine** — no gap, no re-decode.
+  **Default off (`crossfade=0`, `gapless=False`) = byte-for-byte the old behavior**
+  (the engine sets `_at_end`, the poll's `consume_end()` → `_on_media_ended`).
+- **Discord Rich Presence** lives in `justmusic/richpresence.py` (`DiscordPresence`),
+  an optional, thread-safe, fault-tolerant wrapper over **`pypresence`** (imported
+  lazily; `pypresence_available()` gates the UI). It needs Discord running **and** a
+  user-supplied **Application Client ID** (`settings.discord_client_id`). Updates are
+  throttled (~15s, immediate on track/play-state change) and pushed from `_on_poll`
+  (`_tick % 80`), on `trackChanged`, and on play/pause. Connection failures degrade
+  silently (Discord closed / bad ID → no-op). Slots: `setCrossfade`, `setGapless`,
+  `setDiscordRpc`, `setDiscordClientId`.
+
+---
+
 ## 7. Packaging and distribution
 
 - **PyInstaller onedir.** `build.py` builds a windowed one-dir bundle (default;
