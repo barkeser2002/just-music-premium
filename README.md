@@ -7,7 +7,7 @@
 <p align="center">
   Windows için profesyonel müzik çalar — <b>Spotify tarzı QtWebEngine arayüzü</b> +
   <b>yerli DSP ses motoru</b> (gerçek zamanlı EQ & efektler) + <b>gömülü yt-dlp/ffmpeg</b> +
-  <b>htdemucs stüdyo karaoke</b>.
+  <b>htdemucs stüdyo karaoke</b> + <b>crossfade/gapless</b> + <b>Discord Rich Presence</b>.
 </p>
 
 <p align="center">
@@ -41,6 +41,20 @@
 - `.msi` **GitHub Actions'ta bulutta** derlenir (bkz. `.github/workflows/build.yml`): `v*` etiketi
   push edilince ffmpeg/yt-dlp/deno indirilir, PyInstaller derler, **WiX** ile `.msi` paketlenir ve
   Release'e yüklenir.
+
+## 🆕 v1.3.0 — kesintisiz geçiş + Discord
+
+- **🎚 Crossfade + boşluksuz (gapless) çalma:** parçalar arasında **eş-güçlü geçiş (0–12 sn)** ya da
+  sınırda **boşluksuz** devam. Sıradaki parça önden çözülür → geçişte tek saniye boşluk/tıkırtı kalmaz.
+  Albüm, canlı kayıt ve DJ setleri için. Varsayılan kapalı; sıralı çalmada devreye girer.
+- **🎮 Discord Rich Presence:** çalan parça + oynat/duraklat durumu **Discord profilinde** görünür (opsiyonel).
+  Ayarlardaki alana kendi **Discord Application ID**'ni gir, toggle'ı aç (Discord açık olmalı).
+- Kontroller **Efektler → "Geçiş & Discord"** kartında (crossfade kaydırıcısı, gapless düğmesi, Discord). TR/EN.
+
+## 🆕 v1.2.1 — theater modu
+
+- **🎭 Theater modu:** tam ekran "Şimdi Çalıyor"da kapak solda, **zaman kodlu sözler sağda** yan yana;
+  çalarken **aktif satır vurgulanır** (Apple Music tarzı sürükleyici görünüm).
 
 ## 🆕 v1.2.0 — modern görünüm
 
@@ -117,6 +131,10 @@ Kod grafiği: `graphify-out/` (`graphify query "..."`).
 - **Kapak mozaiği** (2×2), **özel vurgu rengi** seçici, **gerçek şarkı süreleri**
   (ffmpeg ile), **indirme göstergesi**, **sürükle-bırak ile listeye ekleme**,
   **klavye kısayolları penceresi**, alt bar mini görselleştirici.
+- **🎚 Crossfade + boşluksuz (gapless) geçiş:** sıradaki parça önden çözülür; eş-güçlü eritme (0–12 sn)
+  veya sınırda boşluksuz devam. *(v1.3.0)*
+- **🎮 Discord Rich Presence:** çalan parçayı Discord profilinde göster (opsiyonel, Client ID ile). *(v1.3.0)*
+- **🎭 Theater modu:** tam ekranda kapak + senkron sözler yan yana, aktif satır vurgulu. *(v1.2.1)*
 - **Premium tipografi:** gömülü Sora (başlıklar) + Manrope (gövde) fontları.
 
 ### 🚀 Çağ açıcı (bize özel DSP) özellikler
