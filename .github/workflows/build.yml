@@ -52,14 +52,32 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force bin | Out-Null
+          # Dayanıklı indirici: sırayla yansıları dene, her birini 3 kez tekrar et
+          # (gyan.dev CI'da sık 503 verir; ffmpeg birincil olarak güvenilir BtbN mirror'undan).
+          function Get-File([string[]]$urls, [string]$out) {
+            foreach ($u in $urls) {
+              for ($i = 1; $i -le 3; $i++) {
+                try {
+                  Write-Host "GET $u (deneme $i)"
+                  Invoke-WebRequest $u -OutFile $out -TimeoutSec 300 -UseBasicParsing
+                  if ((Test-Path $out) -and ((Get-Item $out).Length -gt 100000)) { return }
+                } catch { Write-Host "  hata: $($_.Exception.Message)" }
+                Start-Sleep -Seconds ($i * 5)
+              }
+            }
+            throw "Indirilemedi: $out"
+          }
           Write-Host "ffmpeg…"
-          Invoke-WebRequest "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
+          Get-File @(
+            "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+            "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+          ) ffmpeg.zip
           Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_tmp -Force
           Copy-Item (Get-ChildItem ffmpeg_tmp -Recurse -Filter ffmpeg.exe | Select-Object -First 1).FullName bin\ffmpeg.exe -Force
           Write-Host "yt-dlp…"
-          Invoke-WebRequest "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile bin\yt-dlp.exe
+          Get-File @("https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe") bin\yt-dlp.exe
           Write-Host "deno…"
-          Invoke-WebRequest "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip" -OutFile deno.zip
+          Get-File @("https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip") deno.zip
           Expand-Archive deno.zip -DestinationPath deno_tmp -Force
           Copy-Item deno_tmp\deno.exe bin\deno.exe -Force
           Get-ChildItem bin | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
