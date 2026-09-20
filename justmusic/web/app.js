@@ -669,6 +669,7 @@ function onTrackChanged(){
     if(track.repeat_mode!=null)active.repeat_mode=track.repeat_mode;}
   waveData=[];moodData=null;loopAB=null;updateMoodChip();  // yeni parça: analiz bekleniyor
   updatePlayer();highlightActive();renderRightPanel();
+  if(track&&!track.none&&track.cover)applyCoverAccent(track.cover);   // kapak renginden adaptif accent
   if(view==='lyrics')renderLyricsView();
 }
 function toggleShuffle(){active.shuffle=!active.shuffle;bridge.setShuffle(active.shuffle);$('#pShuffle').classList.toggle('on',active.shuffle);showToast(active.shuffle?'Karışık çalma açık':'Sıralı çalma');}
@@ -719,6 +720,7 @@ function initFromState(){
   applyStaticI18n();                      // statik kabuğu çevir
   applyTheme(st.theme||'green');
   if(st.accent)applyAccentHex(st.accent);
+  autoCoverColor=!st.accent;   // kullanıcı özel renk seçmediyse kapak-renginden adaptif accent açık
   volume=st.volume!=null?st.volume:80;setVolumeUI(volume);
   speed=st.speed||1.0;$('#speedSel').value=speed;
   eqEnabled=st.eq_enabled!==false;
@@ -794,7 +796,7 @@ function wireEvents(){
   $('#backupBtn').onclick=()=>bridge.backup();
   $('#langSel').onchange=e=>applyLanguage(e.target.value);
   $('#themeSel').onchange=e=>{applyTheme(e.target.value);bridge.setTheme(e.target.value);};
-  $('#accentPick').oninput=e=>{applyAccentHex(e.target.value);bridge.setAccent(e.target.value);};
+  $('#accentPick').oninput=e=>{autoCoverColor=false;applyAccentHex(e.target.value);bridge.setAccent(e.target.value);};  // elle renk seçince kapak-accent kapanır
   $('#pQueueBtn').onclick=()=>showView('queue');
   $('#pFsBtn').onclick=openFullscreen;
   document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){e.preventDefault();openPalette();}});
@@ -853,6 +855,23 @@ function applyAccentHex(hex){const rgb=hexToRgb(hex);const l=lighten(rgb,.2);
   const R=document.documentElement.style;
   R.setProperty('--accent',hex);R.setProperty('--accent2','rgb('+l.join(',')+')');R.setProperty('--accent-rgb',rgb.join(','));
   const ap=$('#accentPick');if(ap)ap.value=hex;}
+/* Kapak renginden okunur bir accent üret: doygunluk+parlaklık okunabilir aralığa clamp'lenir. */
+function _clampAccentHex(rgbStr){
+  var m=(rgbStr||'').match(/\d+/g);if(!m)return null;
+  var r=+m[0]/255,g=+m[1]/255,b=+m[2]/255;
+  var mx=Math.max(r,g,b),mn=Math.min(r,g,b),h=0,s=0,l=(mx+mn)/2,dd=mx-mn;
+  if(dd){s=l>.5?dd/(2-mx-mn):dd/(mx+mn);
+    if(mx===r)h=(g-b)/dd+(g<b?6:0);else if(mx===g)h=(b-r)/dd+2;else h=(r-g)/dd+4;h/=6;}
+  s=Math.max(.45,Math.min(.85,s));l=Math.max(.46,Math.min(.60,l));   // canlı + okunur orta ton
+  function hue(p,q,t){if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;}
+  var q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;
+  var R=Math.round(hue(p,q,h+1/3)*255),G=Math.round(hue(p,q,h)*255),B=Math.round(hue(p,q,h-1/3)*255);
+  return '#'+[R,G,B].map(function(x){return('0'+x.toString(16)).slice(-2);}).join('');
+}
+function applyCoverAccent(cover){
+  if(!cover||!autoCoverColor)return;
+  dominantColor(cover,function(c){if(!c||!autoCoverColor)return;var hex=_clampAccentHex(c);if(hex)applyAccentHex(hex);});
+}
 
 // -- çalma listesi kapak mozaiği (Spotify tarzı 2x2) --
 function coverBlock(songs,cls){
@@ -974,7 +993,7 @@ function drawPlayerViz(){
 }
 
 /* -- ÇAĞ AÇICI: Şarkı DNA'sı (dalga formu), Ruh Hali, A-B döngü, Ambiyans -- */
-let waveData=[], moodData=null, loopAB=null, ambientOn=false, autoMoodColor=false;
+let waveData=[], moodData=null, loopAB=null, ambientOn=false, autoMoodColor=false, autoCoverColor=false;
 function onAnalysis(json){
   let d;try{d=JSON.parse(json);}catch(e){return;}
   if(!track||track.none||d.id!==track.id)return;
