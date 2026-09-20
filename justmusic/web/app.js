@@ -584,6 +584,10 @@ function renderLyricsView(){
 /* ================= RIGHT PANEL (now playing) ================= */
 function renderRightPanel(){
   const p=$('#rightPanel');if(!p.classList.contains('show')){return;}
+  // now-playing hero: blurlu kapak arka planı (Apple Music tarzı)
+  var hasCov=!!(track&&!track.none&&track.cover);
+  p.style.setProperty('--np-cover',hasCov?('url("'+track.cover+'")'):'none');
+  p.classList.toggle('has-np',hasCov);
   p.innerHTML='';const pad=el('div','np-pad');
   if(!track||track.none){pad.appendChild(el('div','empty-hint',T('Çalan parça yok.')));
     const cv=el('canvas','np-viz');cv.id='vizCanvas';pad.appendChild(cv);p.appendChild(pad);return;}
@@ -943,7 +947,9 @@ function renderStats(){
 function openFullscreen(){
   closeFullscreen();
   const o=el('div','fs-now');o.id='fsNow';
-  const bg=el('div','fs-bg');o.appendChild(bg);
+  const bg=el('div','fs-bg');
+  if(track&&!track.none&&track.cover)bg.style.backgroundImage='url("'+track.cover+'")';  // blurlu kapak arka planı
+  o.appendChild(bg);
   const close=el('button','fs-close','✕');close.onclick=closeFullscreen;o.appendChild(close);
   const inner=el('div','fs-inner');
   const cov=track&&!track.none?coverImg('fs-cover',track):el('img','fs-cover');if(!track||track.none)cov.src=PLACEHOLDER;
@@ -954,7 +960,8 @@ function openFullscreen(){
   const cv=el('canvas','fs-viz');cv.id='fsViz';info.appendChild(cv);
   if(track&&!track.none&&track.lyrics){const ly=el('div','fs-lyrics',track.lyrics);info.appendChild(ly);}
   inner.appendChild(info);o.appendChild(inner);
-  if(track&&!track.none)dominantColor(track.cover,c=>{if(c)bg.style.background='radial-gradient(1200px 700px at 30% 20%, '+c+', #0a0a0b 70%)';});
+  // kapak varsa blurlu kapak arka planı (yukarıda set edildi); yoksa kapak renginden radyal
+  if(track&&!track.none&&!track.cover)dominantColor(track.cover,c=>{if(c)bg.style.background='radial-gradient(1200px 700px at 30% 20%, '+c+', #0a0a0b 70%)';});
   document.body.appendChild(o);
   document.addEventListener('keydown',fsEsc);
 }
