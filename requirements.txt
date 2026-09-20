@@ -11,6 +11,10 @@ yt-dlp>=2026.8.19   # YouTube imza/player'ı sık değişir; taban güncel tutul
 # torch'un CPU tekerleği yeterli (~490 MB); CUDA sürümü gerekmez.
 demucs>=4.0
 
+# Discord Rich Presence (opsiyonel; Discord uygulaması + Client ID gerektirir).
+# Yoksa uygulama sorunsuz çalışır, yalnız Discord durumu görünmez.
+pypresence>=4.3
+
 # Derleme (exe üretmek) için
 pyinstaller>=6.6
 

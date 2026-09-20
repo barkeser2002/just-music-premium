@@ -63,6 +63,11 @@ img{display:block}
 .mini-sel:focus-visible{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.35)}
 .mini-sel option{background:#1a1b1e;color:#fff;font-weight:600}
 .mini-sel::-ms-expand{display:none}
+.mini-input{width:100%;background:var(--panel2);color:#fff;border:1px solid transparent;border-radius:12px;
+  padding:8px 12px;font-size:12px;font-family:inherit;outline:none;transition:.15s;box-sizing:border-box}
+.mini-input::placeholder{color:var(--muted2)}
+.mini-input:focus-visible{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.3)}
+.toggle input:disabled+*,.toggle input:disabled{opacity:.5}
 
 /* ---------- GÖVDE ---------- */
 .body{flex:1;display:flex;gap:8px;padding:0 8px 8px;min-height:0}

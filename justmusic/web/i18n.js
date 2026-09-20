@@ -70,6 +70,20 @@
       '🔊 Ses Eşitleme (Normalize)': '🔊 Loudness (Normalize)', '🏛 Ortam (Reverb Preset)': '🏛 Room (Reverb Preset)',
       '↺ Efektleri Sıfırla': '↺ Reset effects', '🌊 Odak Sesleri': '🌊 Focus Sounds', 'Seviye': 'Level',
       'Müzik olmadan da çalar — odaklanmak/uyumak için.': 'Plays even without music — to focus or sleep.',
+      '🎚 Geçiş & Discord': '🎚 Transitions & Discord', '🎚 Crossfade (sn)': '🎚 Crossfade (s)',
+      'Kapalı': 'Off', '▶ Boşluksuz Çalma (Gapless)': '▶ Gapless Playback',
+      'Crossfade parçaları üst üste eritir; boşluksuz mod sınırda kesintisiz geçer (albüm/DJ setleri için).':
+        'Crossfade blends tracks together; gapless mode joins seamlessly at the boundary (for albums/DJ sets).',
+      '🎮 Discord Durumu (Rich Presence)': '🎮 Discord Status (Rich Presence)',
+      'Discord Application Client ID': 'Discord Application Client ID',
+      'discord.com/developers → uygulama oluştur → Application ID’yi buraya yapıştır. Discord açık olmalı.':
+        'discord.com/developers → create an app → paste the Application ID here. Discord must be running.',
+      'pypresence bu derlemede yok — Discord durumu devre dışı.':
+        'pypresence is missing in this build — Discord status is disabled.',
+      'Crossfade: {n} sn': 'Crossfade: {n} s', 'Crossfade kapalı': 'Crossfade off',
+      'Boşluksuz çalma açık': 'Gapless playback on', 'Boşluksuz çalma kapalı': 'Gapless playback off',
+      'Discord için önce Client ID girin (Ayarlar).': 'Enter a Client ID first (Settings) for Discord.',
+      'Discord durumu açık': 'Discord status on', 'Discord durumu kapalı': 'Discord status off',
       '🎚 Preamp': '🎚 Preamp', '🔊 Bass Boost': '🔊 Bass Boost', '🎙 Karaoke (Vokal Azalt)': '🎙 Karaoke (Reduce Vocals)',
       '📣 Echo (Yankı)': '📣 Echo', '⏱ Echo Süresi': '⏱ Echo Time', '🔁 Echo Tekrarı': '🔁 Echo Feedback',
       '🏛 Reverb (Oda)': '🏛 Reverb (Room)', '🌀 8D Spatial': '🌀 8D Spatial',

@@ -40,6 +40,7 @@ def main() -> int:
         "--collect-all", "safetensors",
         "--collect-all", "sphn",
         "--collect-all", "huggingface_hub",
+        "--collect-all", "pypresence",            # Discord Rich Presence (opsiyonel)
         # gömülü ikili dosyalar
         "--add-binary", f"{os.path.join(here, 'bin', 'ffmpeg.exe')}{sep}bin",
         "--add-binary", f"{os.path.join(here, 'bin', 'yt-dlp.exe')}{sep}bin",

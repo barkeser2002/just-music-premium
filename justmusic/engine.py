@@ -244,6 +244,18 @@ def spectrogram(audio: np.ndarray, sr: int = SR, cols: int = 130, rows: int = 48
     return [[round(float(v), 2) for v in col] for col in arr.tolist()]
 
 
+def _interp_block(audio: np.ndarray, pos: float, frames: int, speed: float):
+    """pos'tan başlayıp frames örnek (speed hızıyla) doğrusal-ara-değerli blok üretir."""
+    n = audio.shape[0]
+    idx = pos + np.arange(frames) * speed
+    i0 = np.floor(idx).astype(np.int64)
+    frac = (idx - i0).astype(np.float32)
+    i0 = np.clip(i0, 0, n - 2)
+    block = (audio[i0] * (1.0 - frac)[:, None]
+             + audio[i0 + 1] * frac[:, None]).astype(np.float32)
+    return block, idx
+
+
 class DspEngine:
     def __init__(self) -> None:
         self.sr = SR
@@ -288,6 +300,16 @@ class DspEngine:
         self._rv_gains = [0.62, 0.48, 0.36, 0.26, 0.18]
         self._spatial_phase = 0.0
 
+        # geçiş: crossfade / gapless (sıradaki parçayı önden çöz, sınırda harmanla)
+        self.crossfade_sec = 0.0       # 0 = crossfade yok
+        self.gapless = False           # sınırda kesintisiz (boşluksuz) terfi
+        self._next_audio: np.ndarray | None = None
+        self._next_path = None
+        self._next_pos = 0.0
+        self._next_gen = 0
+        self._next_loading = None
+        self._advanced = None          # terfi eden yeni parçanın yolu (poller tüketir)
+
         # görselleştirici spektrumu
         self._spectrum = np.zeros(N_BARS, dtype=np.float32)
         self._win = np.hanning(BLOCK).astype(np.float32)
@@ -325,6 +347,8 @@ class DspEngine:
         self._gen += 1
         gen = self._gen
         self.load_error = ""
+        self.clear_next()          # elle parça değişimi: bekleyen crossfade önyüklemesini at
+        self._advanced = None
         with self._lock:
             self.audio = None
             self.current_path = None
@@ -388,6 +412,71 @@ class DspEngine:
         self._echo_ring[:] = 0
         self._rv_ring[:] = 0
 
+    # ---------------------------------------------------- crossfade / gapless
+    def set_crossfade(self, sec: float) -> None:
+        self.crossfade_sec = max(0.0, min(12.0, float(sec)))
+
+    def set_gapless(self, on: bool) -> None:
+        self.gapless = bool(on)
+
+    def preload_next(self, path: str) -> None:
+        """Sıradaki parçayı arka planda çöz (kesintisiz/crossfade geçiş için)."""
+        with self._lock:
+            if self._next_path == path and self._next_audio is not None:
+                return
+        if self._next_loading == path:
+            return
+        self._next_gen += 1
+        gen = self._next_gen
+        self._next_loading = path
+        threading.Thread(target=self._preload_worker, args=(path, gen), daemon=True).start()
+
+    def _preload_worker(self, path: str, gen: int) -> None:
+        try:
+            audio = decode_audio(path)
+        except Exception:
+            if gen == self._next_gen:
+                self._next_loading = None
+            return
+        if gen != self._next_gen:
+            return  # bu arada iptal edildi / değişti
+        with self._lock:
+            self._next_audio = audio
+            self._next_path = path
+            self._next_pos = 0.0
+        self._next_loading = None
+
+    def clear_next(self) -> None:
+        self._next_gen += 1
+        self._next_loading = None
+        with self._lock:
+            self._next_audio = None
+            self._next_path = None
+            self._next_pos = 0.0
+
+    def has_next_loaded(self) -> bool:
+        return self._next_audio is not None
+
+    def consume_advanced(self):
+        """Crossfade/gapless ile terfi eden yeni parçanın yolunu döndürür (bir kez)."""
+        p = self._advanced
+        if p is not None:
+            self._advanced = None
+        return p
+
+    def _promote_next(self) -> None:
+        """Sıradaki parçayı geçerli parça yap (kilit tutulurken çağrılır)."""
+        self.audio = self._next_audio
+        self.current_path = self._next_path
+        self.pos = self._next_pos
+        self._advanced = self._next_path
+        self._at_end = False
+        self.playing = True
+        self._next_audio = None
+        self._next_path = None
+        self._next_pos = 0.0
+        self._next_gen += 1
+
     # ------------------------------------------------------------- transport
     def play(self) -> None:
         with self._lock:
@@ -413,6 +502,8 @@ class DspEngine:
 
     def clear(self) -> None:
         """Yüklü parçayı boşaltır (is_loaded -> False)."""
+        self.clear_next()
+        self._advanced = None
         with self._lock:
             self.audio = None
             self.current_path = None
@@ -512,24 +603,52 @@ class DspEngine:
                 n = audio.shape[0]
                 speed = self.speed
                 pos = self.pos
+                nxt = self._next_audio
+                xf = self.crossfade_sec
+                loop_active = (self.loop_a is not None and self.loop_b is not None)
+                can_trans = (nxt is not None) and (not loop_active)
+
                 if pos >= n - 1:
-                    self.playing = False
-                    self._at_end = True
-                    outdata[:] = self._gen_soundscape(frames) if (sc != "off" and sc_lvl > 0) else 0
-                    return
-                idx = pos + np.arange(frames) * speed
-                i0 = np.floor(idx).astype(np.int64)
-                frac = (idx - i0).astype(np.float32)
-                i0 = np.clip(i0, 0, n - 2)
-                block = (audio[i0] * (1.0 - frac)[:, None]
-                         + audio[i0 + 1] * frac[:, None]).astype(np.float32)
-                self.pos = pos + frames * speed
-                # A-B döngü (pratik modu)
-                if self.loop_b is not None and self.loop_a is not None and self.pos >= self.loop_b * self.sr:
+                    # geçerli parça bitti: sıradaki hazırsa kesintisiz terfi et
+                    if can_trans and (xf > 0 or self.gapless):
+                        self._promote_next()
+                        audio = self.audio
+                        n = audio.shape[0]
+                        pos = self.pos
+                        nxt = None
+                        can_trans = False
+                    else:
+                        self.playing = False
+                        self._at_end = True
+                        outdata[:] = self._gen_soundscape(frames) if (sc != "off" and sc_lvl > 0) else 0
+                        return
+
+                block, idx = _interp_block(audio, pos, frames, speed)
+                new_pos = pos + frames * speed
+                self.pos = new_pos
+
+                if loop_active and self.pos >= self.loop_b * self.sr:
                     self.pos = self.loop_a * self.sr
+                elif can_trans and xf > 0:
+                    # crossfade: kalan süre <= xf iken sıradaki parçayı eş-güçle harmanla
+                    sec_left = (n - 1 - idx) / self.sr
+                    if float(sec_left.min()) <= xf:
+                        npos = self._next_pos
+                        nblock, _ = _interp_block(nxt, npos, frames, speed)
+                        self._next_pos = npos + frames * speed
+                        t = np.clip(1.0 - sec_left / xf, 0.0, 1.0).astype(np.float32)
+                        gin = np.sin(t * (math.pi / 2))[:, None]
+                        gout = np.cos(t * (math.pi / 2))[:, None]
+                        block = (block * gout.astype(np.float32)
+                                 + nblock * gin.astype(np.float32)).astype(np.float32)
+                        if new_pos >= n - 1:
+                            self._promote_next()   # geçerli bitti -> sıradakine terfi
                 elif self.pos >= n - 1:
-                    self._at_end = True
-                    self.playing = False
+                    if can_trans and self.gapless:
+                        self._promote_next()       # boşluksuz: sınırda hemen terfi
+                    else:
+                        self._at_end = True
+                        self.playing = False
                 sos = self._sos
                 eq_on = self.eq_enabled
                 preamp = self.preamp

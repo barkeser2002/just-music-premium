@@ -15,7 +15,7 @@ import sys
 from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QApplication, QFileDialog
 
-from . import config, engine as engine_mod, eqpresets, naming, separation, updater
+from . import config, engine as engine_mod, eqpresets, naming, richpresence, separation, updater
 from .covers import CoverFetcher
 from .downloader import DownloadThread
 from .engine import DspEngine
@@ -328,6 +328,13 @@ class Bridge(QObject):
         self._sep_song_id = None      # ayırmanın hedef parçası
         self._sep_target = "off"      # ayırma bitince uygulanacak mod
 
+        # Discord Rich Presence (opsiyonel)
+        self.discord = richpresence.DiscordPresence(
+            str(self.library.settings.get("discord_client_id", "")))
+        self._discord_last = 0.0
+        if self.library.settings.get("discord_rpc"):
+            self.discord.enable()
+
         self._apply_audio_settings()
         self.poll = QTimer(self)
         self.poll.timeout.connect(self._on_poll)
@@ -385,6 +392,8 @@ class Bridge(QObject):
         sc = s.get("soundscape")
         if isinstance(sc, list) and len(sc) == 2:
             self.engine.set_soundscape(sc[0], sc[1])
+        self.engine.set_crossfade(float(s.get("crossfade", 0)))
+        self.engine.set_gapless(bool(s.get("gapless", False)))
 
     # ================= durum =================
     @pyqtSlot(result=str)
@@ -420,6 +429,7 @@ class Bridge(QObject):
             "favoritesName": config.FAVORITES_PLAYLIST,
             "demucs": separation.demucs_available(),   # stüdyo karaoke motoru var mı
             "karaokeMode": self._karaoke_mode,
+            "discordAvail": richpresence.pypresence_available(),
         })
 
     def _recent_views(self) -> list:
@@ -478,6 +488,7 @@ class Bridge(QObject):
         self._record_recent(self.play_list_name, song["id"])
         self.trackChanged.emit(self._track_json())
         self._cover_dirty = True
+        self._discord_update(force=True)
 
     def _record_recent(self, playlist: str, sid: str) -> None:
         rec = self.library.settings.setdefault("recent", [])
@@ -671,6 +682,96 @@ class Bridge(QObject):
     def setSoundscape(self, kind: str, level: float) -> None:
         self.engine.set_soundscape(kind, level)
         self.library.settings["soundscape"] = [kind, level]
+
+    # ---- geçiş: crossfade / gapless ----
+    @pyqtSlot(float)
+    def setCrossfade(self, sec: float) -> None:
+        sec = max(0.0, min(12.0, float(sec)))
+        self.engine.set_crossfade(sec)
+        self.library.settings["crossfade"] = sec
+        self.library.save()
+        self.toastSignal.emit(f"Crossfade: {sec:g} sn" if sec > 0 else "Crossfade kapalı")
+
+    @pyqtSlot(bool)
+    def setGapless(self, on: bool) -> None:
+        self.engine.set_gapless(bool(on))
+        self.library.settings["gapless"] = bool(on)
+        self.library.save()
+        self.toastSignal.emit("Boşluksuz çalma açık" if on else "Boşluksuz çalma kapalı")
+
+    # ---- Discord Rich Presence ----
+    @pyqtSlot(bool)
+    def setDiscordRpc(self, on: bool) -> None:
+        self.library.settings["discord_rpc"] = bool(on)
+        self.library.save()
+        if on:
+            if not self.discord.client_id:
+                self.toastSignal.emit("Discord için önce Client ID girin (Ayarlar).")
+                return
+            self.discord.enable()
+            self._discord_update(force=True)
+            self.toastSignal.emit("Discord durumu açık")
+        else:
+            self.discord.disable()
+            self.toastSignal.emit("Discord durumu kapalı")
+
+    @pyqtSlot(str)
+    def setDiscordClientId(self, cid: str) -> None:
+        cid = (cid or "").strip()
+        self.library.settings["discord_client_id"] = cid
+        self.library.save()
+        self.discord.set_client_id(cid)
+        if cid and self.library.settings.get("discord_rpc"):
+            self.discord.enable()
+            self._discord_update(force=True)
+
+    def _discord_update(self, force: bool = False) -> None:
+        """Çalan parçayı Discord'a yansıtır (poll'dan ~5 sn'de bir ya da parça değişince)."""
+        if not self.library.settings.get("discord_rpc"):
+            return
+        song = (self.library.find_song(self.play_list_name, self.active_song_id)
+                if self.active_song_id else None)
+        if not song:
+            self.discord.clear()
+            return
+        try:
+            self.discord.update(
+                title=song.get("title", ""),
+                artist=song.get("artist", ""),
+                playing=self.engine.is_playing(),
+                position=self.engine.position(),
+                duration=self.engine.duration(),
+            )
+        except Exception:
+            pass
+
+    def _on_crossfade_advanced(self, path: str) -> None:
+        """Motor crossfade/gapless ile sıradaki parçaya kendiliğinden geçti —
+        arayüzü yeniden yükleme yapmadan (boşluksuz) güncelle."""
+        songs = self.library.playlists.get(self.play_list_name, [])
+        if not songs:
+            return
+        idx = (self.play_index + 1) % len(songs)
+        if not (0 <= idx < len(songs) and songs[idx].get("path") == path):
+            idx = next((i for i, s in enumerate(songs) if s.get("path") == path), -1)
+        if idx < 0:
+            return
+        song = songs[idx]
+        self.play_index = idx
+        self.active_song_id = song["id"]
+        song["play_count"] = song.get("play_count", 0) + 1
+        self._last_dur = -1.0
+        self._loop_a = self._loop_b = None
+        self.loopSignal.emit(-1.0, -1.0)
+        self._cur_gain = float(song.get("lgain", 1.0))
+        self._apply_norm_gain()
+        self._maybe_fetch_cover(song)
+        if not song.get("lyrics"):
+            self._start_lyrics(song)
+        self._record_recent(self.play_list_name, song["id"])
+        self.trackChanged.emit(self._track_json())
+        self._cover_dirty = True
+        self._discord_update(force=True)
 
     # ---- RADİKAL: radyo, kırpma, sıralama, kopya, m3u, liste kapağı ----
     @pyqtSlot(str, str)
@@ -1390,10 +1491,15 @@ class Bridge(QObject):
         if playing != self._last_playing:
             self._last_playing = playing
             self.playingChanged.emit(playing)
+            self._discord_update(force=True)   # oynat/duraklat -> Discord'u hemen tazele
         self.spectrumSignal.emit(json.dumps([round(float(x), 3) for x in eng.spectrum()]))
         if eng.is_loaded():
+            adv = eng.consume_advanced()
+            if adv:
+                self._on_crossfade_advanced(adv)   # motor kendiliğinden sıradakine geçti
             pos, dur = eng.position(), eng.duration()
             self.positionChanged.emit(pos, dur)
+            self._maybe_preload_next(pos, dur)
             if dur > 0 and self.active_song_id:
                 song = self.library.find_song(self.play_list_name, self.active_song_id)
                 if song and not song.get("duration_ms"):
@@ -1420,15 +1526,46 @@ class Bridge(QObject):
                 self._listen_accum -= add
                 self.library.stats["total_seconds"] = self.library.stats.get("total_seconds", 0) + add
         self._tick += 1
+        if self.library.settings.get("discord_rpc") and self._tick % 80 == 0:
+            self._discord_update()   # ~5 sn'de bir Discord durumunu tazele
         if self._tick % 250 == 0 or (self._cover_dirty and self._tick % 50 == 0):
             self.library.save()
             self._cover_dirty = False
+
+    def _maybe_preload_next(self, pos: float, dur: float) -> None:
+        """Crossfade/gapless açıkken sıradaki (sıralı) parçayı önden çözmeye başlar.
+
+        Yalnız öngörülebilir sıralı çalmada: shuffle/kuyruk/tek-tekrar kapalı.
+        """
+        eng = self.engine
+        if not (eng.crossfade_sec > 0 or eng.gapless):
+            return
+        if self.shuffle or self.user_queue or self.repeat_mode == 2:
+            return
+        if dur <= 0 or self.play_index < 0:
+            return
+        lead = (eng.crossfade_sec or 0.0) + 8.0
+        if (dur - pos) > lead:
+            return
+        songs = self.library.playlists.get(self.play_list_name, [])
+        if not songs:
+            return
+        if self.repeat_mode == 0 and self.play_index >= len(songs) - 1:
+            return   # liste sonu, tekrar yok -> sıradaki yok
+        nxt = songs[(self.play_index + 1) % len(songs)]
+        p = nxt.get("path", "")
+        if p and os.path.exists(p):
+            eng.preload_next(p)
 
     # ================= kapanış =================
     def shutdown(self) -> None:
         self._closing = True
         self.download_queue.clear()
         self.poll.stop()
+        try:
+            self.discord.close()
+        except Exception:
+            pass
         try:
             self.engine.close()
         except Exception:

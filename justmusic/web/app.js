@@ -567,6 +567,31 @@ function renderEffects(){
   sc.appendChild(rowL);
   sc.appendChild(el('div','panelHint2',T('Müzik olmadan da çalar — odaklanmak/uyumak için.')));
   wrap.appendChild(sc);
+  // 🎚 Geçiş (crossfade / gapless) + Discord
+  const tr=el('div','fx-card');tr.appendChild(Object.assign(el('h3'),{textContent:T('🎚 Geçiş & Discord')}));
+  let xf=(S.settings&&+S.settings.crossfade)||0;
+  const xfRow=el('div','fx-row');const xfHead=el('div','fx-head');
+  xfHead.appendChild(el('span',null,T('🎚 Crossfade (sn)')));
+  const xfVal=el('span','fx-val',xf?String(xf):T('Kapalı'));xfHead.appendChild(xfVal);
+  xfRow.appendChild(xfHead);
+  xfRow.appendChild(hSlider(0,12,xf,(v)=>{xf=v;xfVal.textContent=v?String(v):T('Kapalı');bridge.setCrossfade(v);}));
+  tr.appendChild(xfRow);
+  const gpRow=el('label','toggle');const gcb=el('input');gcb.type='checkbox';gcb.checked=!!(S.settings&&S.settings.gapless);
+  gcb.onchange=()=>bridge.setGapless(gcb.checked);
+  gpRow.append(gcb,document.createTextNode(' '+T('▶ Boşluksuz Çalma (Gapless)')));gpRow.style.margin='12px 0';tr.appendChild(gpRow);
+  tr.appendChild(el('div','panelHint2',T('Crossfade parçaları üst üste eritir; boşluksuz mod sınırda kesintisiz geçer (albüm/DJ setleri için).')));
+  const dcTog=el('label','toggle');const dcb=el('input');dcb.type='checkbox';dcb.checked=!!(S.settings&&S.settings.discord_rpc);
+  dcb.disabled=!S.discordAvail;
+  dcb.onchange=()=>bridge.setDiscordRpc(dcb.checked);
+  dcTog.append(dcb,document.createTextNode(' '+T('🎮 Discord Durumu (Rich Presence)')));dcTog.style.margin='14px 0 8px';tr.appendChild(dcTog);
+  const dcId=el('input','mini-input');dcId.type='text';dcId.placeholder=T('Discord Application Client ID');
+  dcId.value=(S.settings&&S.settings.discord_client_id)||'';
+  dcId.onchange=()=>bridge.setDiscordClientId(dcId.value.trim());
+  tr.appendChild(dcId);
+  tr.appendChild(el('div','panelHint2',S.discordAvail
+    ?T('discord.com/developers → uygulama oluştur → Application ID’yi buraya yapıştır. Discord açık olmalı.')
+    :T('pypresence bu derlemede yok — Discord durumu devre dışı.')));
+  wrap.appendChild(tr);
   pad.appendChild(wrap);m.appendChild(pad);
 }
 function applyEqUI(){if(window._eqSetters)eqGains.forEach((v,i)=>window._eqSetters[i]&&window._eqSetters[i](v));}
