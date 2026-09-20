@@ -221,7 +221,9 @@ img{display:block}
 
 /* right panel (now playing) */
 .right-panel{width:340px;flex:0 0 auto;background:var(--panel);border-radius:var(--radius);overflow-y:auto;overflow-x:hidden;display:none}
-.right-panel.show{display:block}
+.right-panel.show{display:block;animation:npDrawerIn .32s cubic-bezier(.2,.7,.2,1)}
+@keyframes npDrawerIn{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.right-panel.show{animation:none}}
 .np-pad{padding:16px}
 .np-cover{width:100%;aspect-ratio:1;border-radius:10px;object-fit:cover;box-shadow:var(--shadow);background:#333}
 .np-title{font-size:22px;font-weight:800;margin:16px 0 4px}

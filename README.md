@@ -42,6 +42,15 @@
   push edilince ffmpeg/yt-dlp/deno indirilir, PyInstaller derler, **WiX** ile `.msi` paketlenir ve
   Release'e yüklenir.
 
+## 🆕 v1.4.0 — daraltılabilir kabuk
+
+- **📐 Daraltılabilir kenar çubuğu:** üst bardaki ☰ ile kenar çubuğu **tam (300px) ↔ ikon rayı (64px)**
+  arasında geçer — içeriğe daha çok yer. Daralınca nav ikonları ve çalma listesi kapakları kalır,
+  üzerine gelince isimleri **ipucu (tooltip)** olarak görünür. Durum kaydedilir; kısayol **B**, komut
+  paletinde de var.
+- **🪟 Kayan "Şimdi Çalıyor":** sağ panel çağrılınca **yumuşak kayarak** gelir (Apple Music tarzı çekmece),
+  `prefers-reduced-motion` saygılı.
+
 ## 🆕 v1.3.0 — kesintisiz geçiş + Discord
 
 - **🎚 Crossfade + boşluksuz (gapless) çalma:** parçalar arasında **eş-güçlü geçiş (0–12 sn)** ya da
