@@ -95,6 +95,23 @@ img{display:block}
 .pl-row.active .pl-name{color:var(--accent)}
 .pl-sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 
+/* Daraltılabilir kenar çubuğu — tam ↔ ikon rayı (A/B/C yönlerinin ortak zemini) */
+.sidebar{transition:width .28s cubic-bezier(.2,.7,.2,1)}
+.sidebar-rail .sidebar{width:64px}
+.sidebar-rail .nav-link{gap:0;justify-content:center;padding:11px 0}
+.sidebar-rail .nav-link span,
+.sidebar-rail .lib-title,
+.sidebar-rail .lib-search,
+.sidebar-rail .lib-actions,
+.sidebar-rail .library-head,
+.sidebar-rail .pl-info{display:none}
+.sidebar-rail .library{padding:8px 4px}
+.sidebar-rail .playlist-list{padding-right:0}
+.sidebar-rail .pl-row{justify-content:center;gap:0;padding:5px 0}
+.sidebar-rail .pl-cover,.sidebar-rail .mosaic.pl-cover{width:42px;height:42px}
+#sidebarToggle i{transition:transform .28s cubic-bezier(.2,.7,.2,1)}
+.sidebar-rail #sidebarToggle i{transform:rotate(90deg)}
+
 /* ---------- ANA İÇERİK ---------- */
 .main{flex:1;min-width:0;background:linear-gradient(180deg,#1c1c1c 0,var(--panel) 260px);border-radius:var(--radius);overflow-y:auto;position:relative}
 .view-pad{padding:24px 28px 40px}

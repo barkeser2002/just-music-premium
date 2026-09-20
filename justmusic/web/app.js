@@ -270,6 +270,10 @@ function updateNavButtons(){
   if(f)f.classList.toggle('nav-off',histPos>=history.length-1);
 }
 function pushHistory(){recordHistory();}   // geriye uyum
+function setSidebarRail(on){
+  document.getElementById('app').classList.toggle('sidebar-rail',on);
+  try{localStorage.setItem('jm_sidebar_rail',on?'1':'0');}catch(e){}
+}
 function openPlaylist(name){viewPlaylist=name;view='playlist';setNav('playlist');bridge.selectPlaylist(name);renderPlaylist(name);renderSidebar();
   if(clip)goMiniClip();recordHistory();}   // klip yaşıyorsa küçült, öldürme
 
@@ -747,6 +751,7 @@ function initFromState(){
   $('#speedSel').innerHTML=SPEEDS.map(s=>'<option value="'+s+'">'+s+'x</option>').join('');
   $('#sleepSel').innerHTML=SLEEPS.map(([v,l])=>'<option value="'+v+'">'+T(l)+'</option>').join('');
   applyStaticI18n();                      // statik kabuğu çevir
+  try{ if(localStorage.getItem('jm_sidebar_rail')==='1') setSidebarRail(true); }catch(e){}
   applyTheme(st.theme||'green');
   if(st.accent)applyAccentHex(st.accent);
   autoCoverColor=!st.accent;   // kullanıcı özel renk seçmediyse kapak-renginden adaptif accent açık
@@ -813,6 +818,7 @@ function onUpdateReady(version){
 function wireEvents(){
   document.querySelectorAll('.nav-link').forEach(b=>b.onclick=()=>showView(b.dataset.view));
   $('#navBack').onclick=navBack;$('#navFwd').onclick=navFwd;updateNavButtons();
+  $('#sidebarToggle').onclick=()=>setSidebarRail(!document.getElementById('app').classList.contains('sidebar-rail'));
   $('#homeBtn').onclick=()=>showView('home');
   $('#topSearch').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch(e.target.value);});
   $('#topSearch').addEventListener('input',e=>{localQuery=e.target.value.trim();searchRows=[];/* sorgu değişti: eski YouTube sonuçları bayat */if(localQuery){if(view!=='search')showView('search');else renderSearch();}else if(view==='search')renderSearch();});
