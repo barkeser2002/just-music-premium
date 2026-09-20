@@ -16,7 +16,7 @@ ORG_NAME = "JustMusic"
 
 # Sürüm — GitHub sürüm etiketiyle (v1.0.0) aynı tutulur. CI derlemede etiketten
 # damgalanır (bkz. .github/workflows/build.yml), böylece exe kendi sürümünü bilir.
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.1.1"
 
 # Otomatik güncelleme (GitHub Releases)
 GITHUB_OWNER = "barkeser2002"

@@ -363,7 +363,7 @@ function renderPlaylist(name){
   highlightActive();
 }
 function trackRow(s,i,pl,reorderable){
-  const t=el('div','track');t.dataset.sid=s.id;
+  const t=el('div','track');t.dataset.sid=s.id;t.style.setProperty('--i',Math.min(i,18));
   const idx=el('div','t-index');idx.innerHTML='<span class="num">'+(i+1)+'</span><span class="ic">▶</span>';
   const main=el('div','t-main');
   main.appendChild(coverImg('t-cover',s));
