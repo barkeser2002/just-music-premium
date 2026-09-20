@@ -42,6 +42,16 @@
   push edilince ffmpeg/yt-dlp/deno indirilir, PyInstaller derler, **WiX** ile `.msi` paketlenir ve
   Release'e yüklenir.
 
+## 🆕 v1.5.0 — merkez "Şimdi Çalıyor" (A+B karışımı)
+
+- **🎧 Merkez now-playing hero (Apple Music tarzı):** çalan parça **ana alanda büyük** görünür — dev kapak
+  solda (kapak-renginden blur backdrop), sağda başlık + geniş scrubber + iri transport + tek satır **canlı söz**.
+  Alt player bar'daki 💿 düğmesi (ya da **mini kapağa/parça adına tıkla**, ya da komut paleti) ile açılır.
+- **Tek motor saati:** merkez hero'nun scrubber'ı ve alt bar aynı DSP saatinden beslenir — sapma yok; büyük
+  kapağa/expand'a tıkla → **theater** (mini → merkez → tam ekran zoom merdiveni).
+- Tümüyle **opt-in ve geri alınabilir**: A'nın daraltılabilir rayı (v1.4.0) + bu B hero'su = **A+B karışımı**.
+  `prefers-reduced-motion` saygılı, View-Transition kapak morph'u özellik-testli.
+
 ## 🆕 v1.4.0 — daraltılabilir kabuk
 
 - **📐 Daraltılabilir kenar çubuğu:** üst bardaki ☰ ile kenar çubuğu **tam (300px) ↔ ikon rayı (64px)**

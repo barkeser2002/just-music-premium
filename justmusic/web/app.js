@@ -240,7 +240,9 @@ function showView(v){
   else if(v==='stats')renderStats();
   else if(v==='clip')renderClipView();
   else if(v==='playlist'&&viewPlaylist)renderPlaylist(viewPlaylist);  // klipten listeye dönüş
+  else if(v==='now')renderNowHero();   // B: merkez "Şimdi çalıyor" hero
   else renderHome();
+  document.getElementById('app').classList.toggle('hero-mode',v==='now');
   if(v!=='clip'&&clip)goMiniClip();   // klipten ayrılınca AKIŞI KESME — köşeye küçült
   recordHistory();
 }
@@ -682,7 +684,7 @@ function updatePlayer(){
   $('#pShuffle').classList.toggle('on',active.shuffle);
   updateRepeatBtn();
 }
-function updatePlayBtn(){$('#pPlay').innerHTML=active.playing?fa('pause'):fa('play');}
+function updatePlayBtn(){$('#pPlay').innerHTML=active.playing?fa('pause'):fa('play');const h=$('#heroPlay');if(h)h.innerHTML=active.playing?fa('pause'):fa('play');}
 /* Alt bar HER ZAMAN motoru sürer (ses kaynağı). Klip varsa muted video motoru
    aynalar (playingChanged/positionChanged üzerinden). Tek kontrol noktası. */
 function togglePlayback(){bridge.toggle();}
@@ -705,6 +707,7 @@ function onTrackChanged(){
     if(track.repeat_mode!=null)active.repeat_mode=track.repeat_mode;}
   waveData=[];moodData=null;loopAB=null;updateMoodChip();  // yeni parça: analiz bekleniyor
   updatePlayer();highlightActive();renderRightPanel();
+  if(view==='now')renderNowHero();   // B: merkez hero açıksa yeni parçaya göre tazele
   if(track&&!track.none&&track.cover)applyCoverAccent(track.cover);   // kapak renginden adaptif accent
   if(view==='lyrics')renderLyricsView();
 }
@@ -837,6 +840,9 @@ function wireEvents(){
   $('#accentPick').oninput=e=>{autoCoverColor=false;applyAccentHex(e.target.value);bridge.setAccent(e.target.value);};  // elle renk seçince kapak-accent kapanır
   $('#pQueueBtn').onclick=()=>showView('queue');
   $('#pFsBtn').onclick=openFullscreen;
+  $('#pHeroBtn').onclick=enterHero;                 // B: merkez hero aç/kapa
+  $('#pCover').style.cursor='pointer';$('#pCover').onclick=enterHero;   // mini kapak → merkez hero
+  {const _pm=document.querySelector('.p-meta');if(_pm){_pm.style.cursor='pointer';_pm.onclick=enterHero;}}
   document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){e.preventDefault();openPalette();}});
   // player
   $('#pPlay').onclick=togglePlayback;
@@ -885,7 +891,81 @@ function wireEvents(){
 }
 let lastPos=0,lastDur=0;
 const _origUpdateSeek=updateSeek;
-updateSeek=function(pos,dur){lastPos=pos;lastDur=dur;_origUpdateSeek(pos,dur);syncLyrics(pos);islandSync(pos);};
+updateSeek=function(pos,dur){lastPos=pos;lastDur=dur;_origUpdateSeek(pos,dur);syncLyrics(pos);islandSync(pos);
+  if(view==='now'){                                   // B: merkez hero'yu da aynı motor saatiyle sür
+    if(!seeking){const p=(dur>0?pos/dur*100:0);const hf=$('#heroFill');if(hf)hf.style.width=p+'%';const hk=$('#heroKnob');if(hk)hk.style.left=p+'%';}
+    const hc=$('#heroCur');if(hc)hc.textContent=fmt(pos);
+    const hd=$('#heroDur');if(hd)hd.textContent=fmt(dur);
+    heroLyricSync(pos);
+  }
+};
+
+/* ===== B: Merkez "Şimdi çalıyor" hero (opt-in showView('now')) ===== */
+let heroPrevView='home';
+let _heroLrc=null,_heroLrcId=null;
+function heroLrc(){                                    // parseLRC'i parça id'sine göre memoize et
+  if(!track||track.none)return null;
+  if(_heroLrcId!==track.id){_heroLrcId=track.id;_heroLrc=parseLRC(track.lyrics);}
+  return _heroLrc;
+}
+function renderNowHero(){
+  const m=$('#view');m.innerHTML='';
+  const root=el('div','hero-now');root.id='heroNow';
+  const hasCov=!!(track&&!track.none&&track.cover);
+  root.style.setProperty('--np-cover',hasCov?('url("'+track.cover+'")'):'none');   // renderRightPanel ile aynı
+  root.classList.toggle('has-np',hasCov);
+  root.appendChild(el('div','hero-bg'));
+  if(!track||track.none){root.appendChild(el('div','hero-empty',T('Bir şey çal ve burada büyük görünsün.')));m.appendChild(root);return;}
+  const inner=el('div','hero-inner');
+  const cov=coverImg('hero-cover',track);cov.title=T('Tam ekran');cov.onclick=openFullscreen;   // büyük kapak → theater
+  inner.appendChild(cov);
+  const body=el('div','hero-body');
+  body.appendChild(el('div','hero-eyebrow',T('Şimdi çalıyor')));
+  body.appendChild(el('div','hero-title',track.title));
+  body.appendChild(el('div','hero-artist',track.artist||T('Yerel Parça')));
+  const lyr=el('div','hero-lyric');lyr.id='heroLyric';body.appendChild(lyr);
+  const seek=el('div','hero-seek');
+  const cur=el('span','time',fmt(lastPos));cur.id='heroCur';
+  const bar=el('div','bar');bar.id='heroBar';
+  const fill=el('div','bar-fill');fill.id='heroFill';
+  const knob=el('div','bar-knob');knob.id='heroKnob';
+  bar.append(fill,knob);
+  const dur=el('span','time',fmt(lastDur));dur.id='heroDur';
+  seek.append(cur,bar,dur);body.appendChild(seek);
+  if(lastDur>0){fill.style.width=(lastPos/lastDur*100)+'%';knob.style.left=(lastPos/lastDur*100)+'%';}
+  attachDrag(bar,(f,live)=>{seeking=live;fill.style.width=(f*100)+'%';knob.style.left=(f*100)+'%';   // #seekBar ile birebir
+    if(!live)seekTo(f*lastDur);else cur.textContent=fmt(f*lastDur);},false);
+  const ctr=el('div','hero-controls');
+  const sh=faBtn('hero-ic'+(active.shuffle?' on':''),'shuffle');sh.onclick=toggleShuffle;
+  const pv=faBtn('hero-ic','backward-step');pv.onclick=()=>bridge.prev();
+  const pl=el('button','hero-play');pl.id='heroPlay';pl.innerHTML=active.playing?fa('pause'):fa('play');pl.onclick=togglePlayback;
+  const nx=faBtn('hero-ic','forward-step');nx.onclick=()=>bridge.next();
+  const rp=faBtn('hero-ic'+(((active.repeat_mode||0)!==0)?' on':''),'repeat');rp.onclick=cycleRepeat;
+  ctr.append(sh,pv,pl,nx,rp);body.appendChild(ctr);
+  const acts=el('div','hero-actions');
+  const fav=faBtn('hero-ic2'+(track.favorite?' on':''),'heart');fav.title=T('Beğen');fav.onclick=()=>bridge.toggleFavorite(track.id,track.playlist);
+  const exp=faBtn('hero-ic2','expand');exp.title=T('Tam ekran');exp.onclick=openFullscreen;
+  const lyrc=faBtn('hero-ic2','align-left');lyrc.title=T('Şarkı Sözleri');lyrc.onclick=()=>showView('lyrics');
+  const q=faBtn('hero-ic2','list-ol');q.title=T('Kuyruk (Sıradaki)');q.onclick=()=>showView('queue');
+  acts.append(fav,exp,lyrc,q);body.appendChild(acts);
+  inner.appendChild(body);root.appendChild(inner);m.appendChild(root);
+  updateSeek(lastPos,lastDur);                        // scrubber + süreleri hemen doğru bas
+  heroLyricSync(lastPos||0);
+}
+function heroLyricSync(pos){
+  const box=$('#heroLyric');if(!box)return;
+  const lrc=heroLrc();
+  if(!lrc){if(box.textContent)box.textContent='';box.classList.remove('on');return;}
+  let cur=-1;for(let i=0;i<lrc.length;i++){if(pos>=lrc[i].t)cur=i;else break;}
+  const txt=cur>=0?(lrc[cur].txt||''):'';
+  if(box.textContent!==txt)box.textContent=txt;
+  box.classList.toggle('on',!!txt);
+}
+function enterHero(){
+  if(view!=='now')heroPrevView=view;
+  const go=()=>showView(view==='now'?(heroPrevView||'home'):'now');
+  if(document.startViewTransition && !matchMedia('(prefers-reduced-motion:reduce)').matches){try{document.startViewTransition(go);}catch(e){go();}}else go();
+}
 
 /* ================= YENİ ÖZELLİKLER ================= */
 // -- özel vurgu rengi --
@@ -1379,6 +1459,7 @@ function openPalette(){
     ['⛶ Tam Ekran',()=>openFullscreen()],['💡 Ambiyans Işığı',()=>toggleAmbient()],
     ['🎙 Karaoke',()=>toggleKaraoke()],['🎤 Söz Adası',()=>toggleLyricsIsland()],['⌨ Kısayollar',()=>showShortcuts()],
     ['📐 Kenar Çubuğu (daralt/genişlet)',()=>setSidebarRail(!document.getElementById('app').classList.contains('sidebar-rail'))],
+    ['🎧 Şimdi çalıyor (merkez)',()=>showView('now')],
     ['⏭ Sonraki',()=>bridge.next()],['⏮ Önceki',()=>bridge.prev()],['⏯ Oynat/Duraklat',()=>bridge.toggle()],
   ];
   function render(q){
