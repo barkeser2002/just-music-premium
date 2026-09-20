@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="fontawesome/css/all.min.css">
   <link rel="stylesheet" href="app.css">
   <script src="qwebchannel.js"></script>
+  <script src="i18n.js"></script>
 </head>
 <body>
 <div id="ambient" class="ambient"></div>
@@ -26,9 +27,10 @@
       </div>
     </div>
     <div class="topbar-right">
+      <select id="langSel" class="mini-sel" title="Dil / Language"></select>
       <select id="themeSel" class="mini-sel" title="Tema"></select>
       <label class="accent-wrap" title="Özel vurgu rengi"><input type="color" id="accentPick" value="#1db954"></label>
-      <button id="scanBtn"   class="chip-btn" title="Müzik klasörünü tara"><i class="fa-solid fa-rotate"></i> Tara</button>
+      <button id="scanBtn"   class="chip-btn" title="Müzik klasörünü tara"><i class="fa-solid fa-rotate"></i> <span data-i18n="Tara">Tara</span></button>
       <button id="statsBtn"  class="chip-btn" title="İstatistikler"><i class="fa-solid fa-chart-simple"></i></button>
       <button id="compactBtn" class="chip-btn" title="Kompakt mod (panelleri gizle)"><i class="fa-solid fa-compress"></i></button>
       <button id="helpBtn"   class="chip-btn" title="Klavye kısayolları (Ctrl+K komut paleti)"><i class="fa-solid fa-keyboard"></i></button>
@@ -40,15 +42,15 @@
   <div class="body">
     <aside class="sidebar">
       <nav class="nav-links">
-        <button class="nav-link active" data-view="home"><i class="fa-solid fa-house"></i> <span>Ana Sayfa</span></button>
-        <button class="nav-link" data-view="search"><i class="fa-solid fa-magnifying-glass"></i> <span>Ara</span></button>
-        <button class="nav-link" data-view="effects"><i class="fa-solid fa-sliders"></i> <span>Efektler</span></button>
+        <button class="nav-link active" data-view="home"><i class="fa-solid fa-house"></i> <span data-i18n="Ana Sayfa">Ana Sayfa</span></button>
+        <button class="nav-link" data-view="search"><i class="fa-solid fa-magnifying-glass"></i> <span data-i18n="Ara">Ara</span></button>
+        <button class="nav-link" data-view="effects"><i class="fa-solid fa-sliders"></i> <span data-i18n="Efektler">Efektler</span></button>
       </nav>
       <div class="library">
         <div class="library-head">
-          <span class="lib-title">📚 Kitaplığın</span>
+          <span class="lib-title" data-i18n="📚 Kitaplığın">📚 Kitaplığın</span>
           <div class="lib-actions">
-            <button id="importBtn" class="plus-btn" title="MP3 içe aktar"><i class="fa-solid fa-plus"></i> Ekle</button>
+            <button id="importBtn" class="plus-btn" title="MP3 içe aktar"><i class="fa-solid fa-plus"></i> <span data-i18n="Ekle">Ekle</span></button>
             <button id="createPlaylist" class="plus-btn" title="Çalma listesi oluştur"><i class="fa-solid fa-plus"></i></button>
           </div>
         </div>

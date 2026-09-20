@@ -42,6 +42,11 @@
   push edilince ffmpeg/yt-dlp/deno indirilir, PyInstaller derler, **WiX** ile `.msi` paketlenir ve
   Release'e yüklenir.
 
+## 🆕 v1.1.0
+
+- **🌍 Dil desteği (TR + EN)** — üst bardaki dil seçicisinden anında geçiş; seçim kaydedilir.
+  İç veri (mood, korumalı liste adları) Türkçe kalır, yalnız arayüz çevrilir — kütüphanen bozulmaz.
+
 ## 🆕 v1.0.4
 
 - **📃 Playlist toplu indirme** — YouTube playlist URL'si → önizle, seç, X/Y sayaçlı toplu indir.

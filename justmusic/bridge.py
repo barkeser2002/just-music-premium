@@ -1365,6 +1365,11 @@ class Bridge(QObject):
         self.library.settings["accent"] = hex_color
         self.library.save()
 
+    @pyqtSlot(str)
+    def setLanguage(self, code: str) -> None:
+        self.library.settings["lang"] = "en" if code == "en" else "tr"
+        self.library.save()
+
     @pyqtSlot()
     def backup(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
