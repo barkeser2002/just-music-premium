@@ -578,3 +578,10 @@ body.compact .sidebar,body.compact .right-panel{display:none}
 .li-next{ margin-top:6px; font-size:14px; color:rgba(255,255,255,.42); }
 .li-cur .kw{ color:rgba(255,255,255,.4); transition:color .18s ease, text-shadow .18s ease; }
 .li-cur .kw.done{ color:#fff; text-shadow:0 0 14px rgba(var(--accent-rgb),.6); }
+
+/* Theater modu: tam ekranda senkron sözler kapağın yanında */
+.fs-now.theater .fs-info{ max-width:540px; }
+.fs-now.theater .fs-lyrics{ max-height:58vh; -webkit-mask-image:linear-gradient(transparent,#000 12%,#000 86%,transparent);
+  mask-image:linear-gradient(transparent,#000 12%,#000 86%,transparent); }
+.fs-now.theater .fs-lyrics .lrc-line{ font-size:18px; line-height:2.05; }
+.fs-now.theater .fs-lyrics .lrc-line.active{ font-size:24px; text-shadow:0 0 20px rgba(var(--accent-rgb),.4); }

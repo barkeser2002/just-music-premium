@@ -959,7 +959,15 @@ function openFullscreen(){
   info.appendChild(el('div','fs-title',track&&!track.none?track.title:'—'));
   info.appendChild(el('div','fs-artist',track&&!track.none?(track.artist||T('Yerel Parça')):''));
   const cv=el('canvas','fs-viz');cv.id='fsViz';info.appendChild(cv);
-  if(track&&!track.none&&track.lyrics){const ly=el('div','fs-lyrics',track.lyrics);info.appendChild(ly);}
+  if(track&&!track.none&&track.lyrics){
+    const lrc=parseLRC(track.lyrics);
+    if(lrc){                                   // theater modu: senkron sözler kapağın yanında
+      o.classList.add('theater');
+      const ly=el('div','fs-lyrics lrc-lines');ly._lrc=lrc;ly._cur=-2;
+      lrc.forEach(l=>{const ln=el('div','lrc-line',l.txt||' ');ln.onclick=()=>bridge.seek(l.t);ly.appendChild(ln);});
+      info.appendChild(ly);setTimeout(()=>syncLyrics(lastPos||0),0);
+    }else info.appendChild(el('div','fs-lyrics',track.lyrics));
+  }
   inner.appendChild(info);o.appendChild(inner);
   // kapak varsa blurlu kapak arka planı (yukarıda set edildi); yoksa kapak renginden radyal
   if(track&&!track.none&&!track.cover)dominantColor(track.cover,c=>{if(c)bg.style.background='radial-gradient(1200px 700px at 30% 20%, '+c+', #0a0a0b 70%)';});
@@ -1039,11 +1047,13 @@ function parseLRC(text){
   return has?lines.sort((a,b)=>a.t-b.t):null;
 }
 function syncLyrics(pos){
-  const box=document.querySelector('.lrc-lines');if(!box)return;
-  const lines=box._lrc;if(!lines)return;
-  let cur=-1;for(let i=0;i<lines.length;i++){if(pos>=lines[i].t)cur=i;else break;}
-  [...box.children].forEach((el2,i)=>el2.classList.toggle('active',i===cur));
-  if(cur>=0&&box.children[cur]){box.children[cur].scrollIntoView({block:'center',behavior:'smooth'});}
+  document.querySelectorAll('.lrc-lines').forEach(box=>{     // sağ panel + tam ekran theater
+    const lines=box._lrc;if(!lines)return;
+    let cur=-1;for(let i=0;i<lines.length;i++){if(pos>=lines[i].t)cur=i;else break;}
+    if(box._cur===cur)return;box._cur=cur;                  // sadece satır değişince kaydır
+    [...box.children].forEach((el2,i)=>el2.classList.toggle('active',i===cur));
+    if(cur>=0&&box.children[cur]){box.children[cur].scrollIntoView({block:'center',behavior:'smooth'});}
+  });
 }
 /* ---- Dinamik söz adası (word-by-word, yüzen cam) ---- */
 let lyricsIsland=null;
