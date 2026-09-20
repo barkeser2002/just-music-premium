@@ -23,6 +23,7 @@ from .library import Library, make_song
 
 POLL_MS = 60
 _NO_WINDOW = 0x08000000
+MAX_DL_CONCURRENT = 3   # aynı anda kaç indirme (paralel toplu indirme)
 
 
 class SearchThread(QThread):
@@ -299,8 +300,9 @@ class Bridge(QObject):
         self._cur_gain = 1.0
         self.normalize = bool(self.library.settings.get("normalize", False))
         self.download_queue: list[str] = []
-        self.active_download = None
+        self.active_downloads: dict = {}   # {DownloadThread: son_yüzde} — paralel indirme havuzu
         self.download_total = 0        # "X/Y" pill sayacı (toplu indirmede)
+        self.download_done = 0         # tamamlanan (ok+hata) sayısı
         self.scan_thread = None
         self._search = None
         self.user_queue: list[dict] = []      # {"playlist","id"}
@@ -1399,9 +1401,22 @@ class Bridge(QObject):
 
     def _dl_counter(self) -> str:
         if self.download_total > 1:
-            done = self.download_total - len(self.download_queue)
-            return f"{done}/{self.download_total}"
+            return f"{self.download_done}/{self.download_total}"
         return ""
+
+    def _emit_dl_progress(self) -> None:
+        """Paralel indirmelerin toplam ilerlemesini tek pill'e yansıtır."""
+        remaining = len(self.download_queue) + len(self.active_downloads)
+        if self.download_total <= 0 and remaining == 0:
+            self.downloadProgressSignal.emit(0, "", 0)
+            return
+        agg = (self.download_done * 100 + sum(self.active_downloads.values())) / max(1, self.download_total)
+        c = self._dl_counter()
+        label = f"İndiriliyor… {c}".strip()
+        n = len(self.active_downloads)
+        if n > 1:
+            label = f"{label} ({n} etkin)"
+        self.downloadProgressSignal.emit(min(100.0, agg), label, remaining)
 
     @pyqtSlot(str)
     def downloadUrls(self, urls_json: str) -> None:
@@ -1411,34 +1426,53 @@ class Bridge(QObject):
             return
         if isinstance(urls, str):
             urls = [urls]
+        urls = [u for u in urls if u]
         if not urls:
             return
         self.download_queue.extend(urls)
         self.download_total += len(urls)      # toplu sayaç birikir
-        self._maybe_start_download()
+        self._pump_downloads()
 
-    def _maybe_start_download(self) -> None:
-        if self._closing or (self.active_download and self.active_download.isRunning()):
-            return
-        if not self.download_queue:
-            self.download_total = 0            # kuyruk bitti: sayacı sıfırla
-            self.downloadProgressSignal.emit(0, "", 0)
-            return
-        url = self.download_queue.pop(0)
-        c = self._dl_counter()
-        self.downloadProgressSignal.emit(0, f"İndiriliyor… {c}".strip(), len(self.download_queue))
-        t = DownloadThread(url, self)
-        t.progress.connect(lambda pct, s: self.downloadProgressSignal.emit(
-            pct, f"{s} {self._dl_counter()}".strip(), len(self.download_queue)))
-        t.finished_ok.connect(self._on_download_done)
-        t.failed.connect(lambda m: self.toastSignal.emit(m))
-        t.finished.connect(self._download_finished)
-        self.active_download = t
-        t.start()
+    def _pump_downloads(self) -> None:
+        """Havuz doluncaya (MAX_DL_CONCURRENT) kadar kuyruktan paralel indirme başlatır.
 
+        Yalnız ana (Qt) thread'inde çağrılır: kuyruk/havuz mutasyonu ve QThread
+        oluşturma burada olur. Sinyaller QObject-bağlı slotlara gider → Qt onları
+        ana thread'e queue'lar (aşağıda self.sender() ile hangi thread bulunur).
+        """
+        if self._closing:
+            return
+        while self.download_queue and len(self.active_downloads) < MAX_DL_CONCURRENT:
+            url = self.download_queue.pop(0)
+            t = DownloadThread(url, self)
+            t.progress.connect(self._on_dl_progress)
+            t.finished_ok.connect(self._on_download_done)
+            t.failed.connect(self._on_dl_failed)
+            t.finished.connect(self._download_finished)
+            self.active_downloads[t] = 0.0
+            t.start()
+        if not self.download_queue and not self.active_downloads:
+            self.download_total = 0            # kuyruk + havuz boş: sayaçları sıfırla
+            self.download_done = 0
+        self._emit_dl_progress()
+
+    @pyqtSlot(float, str)
+    def _on_dl_progress(self, pct, status) -> None:  # noqa: ARG002
+        t = self.sender()
+        if t in self.active_downloads:
+            self.active_downloads[t] = float(pct)
+        self._emit_dl_progress()
+
+    @pyqtSlot(str)
+    def _on_dl_failed(self, msg) -> None:
+        self.toastSignal.emit(msg)
+
+    @pyqtSlot()
     def _download_finished(self) -> None:
-        self.active_download = None
-        self._maybe_start_download()
+        t = self.sender()
+        self.active_downloads.pop(t, None)
+        self.download_done += 1
+        self._pump_downloads()
 
     def _on_download_done(self, song: dict) -> None:
         # İndirilenler her zaman belli bir (korumalı) listeye gider
@@ -1609,9 +1643,14 @@ class Bridge(QObject):
                 vt.wait(3000)
             except Exception:
                 pass
-        if self.active_download and self.active_download.isRunning():
-            self.active_download.cancel()
-            self.active_download.wait(5000)
+        for t in list(self.active_downloads):
+            try:
+                if t.isRunning():
+                    t.cancel()
+                    t.wait(5000)
+            except Exception:
+                pass
+        self.active_downloads.clear()
         # Güncelleme iş parçacığı hâlâ indiriyorsa kısa bekle, sonra bırak
         if self._update_thread and self._update_thread.isRunning():
             if not self._update_thread.wait(1500):

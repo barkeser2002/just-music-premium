@@ -843,6 +843,11 @@ function wireEvents(){
   $('#pHeroBtn').onclick=enterHero;                 // B: merkez hero aç/kapa
   $('#pCover').style.cursor='pointer';$('#pCover').onclick=enterHero;   // mini kapak → merkez hero
   {const _pm=document.querySelector('.p-meta');if(_pm){_pm.style.cursor='pointer';_pm.onclick=enterHero;}}
+  // ⋯ taşma menüsü: ikincil player kontrolleri (responsive — bar sığmadığında)
+  {const pr=document.querySelector('.p-right'),pe=$('#pExtra');
+   $('#pMore').onclick=e=>{e.stopPropagation();pr.classList.toggle('more-open');};
+   if(pe)pe.addEventListener('click',()=>pr.classList.remove('more-open'),true);   // capture: kontrol seçilince kapat
+   document.addEventListener('click',e=>{if(!pr.contains(e.target))pr.classList.remove('more-open');});}
   document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){e.preventDefault();openPalette();}});
   // player
   $('#pPlay').onclick=togglePlayback;

@@ -263,36 +263,39 @@ img{display:block}
 .bar:hover .bar-fill{background:var(--accent)}
 .bar-knob{position:absolute;top:50%;left:0;width:12px;height:12px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);opacity:0;transition:opacity .1s}
 .bar:hover .bar-knob{opacity:1}
-.p-right{display:flex;align-items:center;gap:12px;justify-self:end;min-width:0}
-/* Dar pencerede player kontrolleri sığsın (taşıp sayfayı yatay kaydırmasın →
-   yatay kayma sol kenar çubuğunu ekrandan iterdi). */
+.p-right{display:flex;align-items:center;gap:12px;justify-self:end;min-width:0;position:relative}
+/* İkincil kontroller (klip/karaoke/ambiyans/kuyruk/söz) VARSAYILAN olarak ⋯ menüsünde:
+   böylece player bar her genişlikte sığar, taşıp sayfayı yatay kaydırıp (sol kenar çubuğunu
+   ekrandan iterek) "sapıtmaz". Kontroller GİZLENMEZ — tek tıkla menüde. */
+.p-more-btn{display:flex}
+.p-extra{position:absolute;bottom:calc(100% + 12px);right:0;display:none;gap:16px;
+  background:var(--panel);border:1px solid #2b2b2b;border-radius:14px;padding:10px 14px;
+  box-shadow:0 14px 40px rgba(0,0,0,.6);z-index:60;animation:viewIn .18s var(--ease-out)}
+.p-right.more-open .p-extra{display:flex}
+.p-extra .icon-btn{font-size:19px;padding:5px}
+/* Çok geniş ekran: yer bol → ikincilleri satır içine aç (⋯ gizlenir) */
+@media(min-width:1500px){
+  .p-more-btn{display:none}
+  .p-extra{position:static;display:flex;gap:12px;background:none;border:none;padding:0;box-shadow:none;animation:none}
+}
 @media(max-width:1240px){
-  .p-center{width:min(40vw,460px)}
-  .p-right{gap:8px}
+  .p-center{width:min(42vw,480px)}
   .p-left{gap:9px}
   .p-controls{gap:16px}
 }
-@media(max-width:1140px){
-  .p-right{gap:6px}
-  .p-right .icon-btn{font-size:16px;padding:3px}
+@media(max-width:1040px){
   .p-right .mini-sel{padding:5px 22px 5px 9px;font-size:11px}
-  .p-center{width:min(34vw,400px)}
-  .p-controls{gap:14px}
-  .vol{width:76px}
-  #sleepSel{display:none}                       /* uyku zamanlayıcı (niş) gizle */
+  .p-center{width:min(40vw,400px)}
+  .vol{width:80px}
+  #sleepSel{display:none}                        /* uyku zamanlayıcı → niş, gizle */
 }
-@media(max-width:1010px){
-  #pAmbient,#pFsBtn,#pPanelBtn{display:none}    /* niş kontroller: ambiyans, tam ekran, panel */
-  .p-right{gap:5px}
-  .vol{width:62px}
+@media(max-width:880px){
+  #speedSel{display:none}                        /* hız → niş */
   .p-cover{width:46px;height:46px}
-  .topbar-right #backupBtn{display:none}
-}
-@media(max-width:900px){
-  #speedSel,#pQueueBtn{display:none}            /* hız + kuyruk (menüden erişilebilir) */
-  .p-center{width:min(40vw,320px)}
-  .p-controls{gap:10px}
-  .topbar-right #helpBtn,.topbar-right #compactBtn{display:none}
+  .p-center{width:min(44vw,340px)}
+  .p-controls{gap:12px}
+  .vol{width:64px}
+  .topbar-right #backupBtn,.topbar-right #helpBtn,.topbar-right #compactBtn{display:none}
   .chip-btn{padding:7px 10px}
 }
 .vol{position:relative;width:100px;height:5px;background:#4d4d4d;border-radius:3px;cursor:pointer}

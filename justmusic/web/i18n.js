@@ -89,6 +89,7 @@
       'Söz adası': 'Lyrics island', 'Kenar çubuğu (daralt/genişlet)': 'Sidebar (collapse/expand)',
       'Şimdi çalıyor (merkez)': 'Now playing (center)', '🎧 Şimdi çalıyor (merkez)': '🎧 Now playing (center)',
       'Bir şey çal ve burada büyük görünsün.': 'Play something to see it big here.',
+      'Daha fazla': 'More',
       '🎚 Preamp': '🎚 Preamp', '🔊 Bass Boost': '🔊 Bass Boost', '🎙 Karaoke (Vokal Azalt)': '🎙 Karaoke (Reduce Vocals)',
       '📣 Echo (Yankı)': '📣 Echo', '⏱ Echo Süresi': '⏱ Echo Time', '🔁 Echo Tekrarı': '🔁 Echo Feedback',
       '🏛 Reverb (Oda)': '🏛 Reverb (Room)', '🌀 8D Spatial': '🌀 8D Spatial',

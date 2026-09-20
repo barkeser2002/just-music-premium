@@ -42,6 +42,14 @@
   push edilince ffmpeg/yt-dlp/deno indirilir, PyInstaller derler, **WiX** ile `.msi` paketlenir ve
   Release'e yüklenir.
 
+## 🆕 v1.6.0 — paralel indirme + responsive player bar
+
+- **⚡ Paralel indirme:** toplu indirmede artık **aynı anda 3 parça** iner (tek tek değil) — playlist
+  toplu indirme çok daha hızlı. Pill toplam ilerlemeyi ve "X/Y (N etkin)" sayacını gösterir; thread-güvenli.
+- **📱 Responsive alt player bar:** kontroller artık dar/orta pencerede **taşmıyor** (taşma sol kenar
+  çubuğunu ekrandan itiyordu). İkincil kontroller (klip, karaoke, ambiyans, kuyruk, söz) bir **⋯ menüsüne**
+  katlanır; çok geniş ekranda satır içinde açılır. Her genişlikte yatay kayma yok.
+
 ## 🆕 v1.5.0 — merkez "Şimdi Çalıyor" (A+B karışımı)
 
 - **🎧 Merkez now-playing hero (Apple Music tarzı):** çalan parça **ana alanda büyük** görünür — dev kapak
